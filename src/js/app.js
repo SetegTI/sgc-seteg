@@ -340,6 +340,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
   bindEnterNoModal(modalAcessoGestor, validarCodigoAcesso);
   bindEnterNoModal(modalAcessoTecnico, validarAcessoTecnico);
+  
+  // Fechar modais com ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      // Fechar modal de detalhes
+      if (modalDetalhes?.classList.contains('active')) {
+        fecharModal();
+      }
+      // Fechar modal de acesso gestor
+      else if (modalAcessoGestor?.classList.contains('active')) {
+        fecharModalAcessoGestor();
+      }
+      // Fechar modal de acesso técnico
+      else if (modalAcessoTecnico?.classList.contains('active')) {
+        fecharModalAcessoTecnico();
+      }
+      // Fechar modal de atribuição
+      else if (modalAtribuicao?.classList.contains('active')) {
+        fecharModalAtribuicao();
+      }
+      // Fechar modal de confirmação
+      else if (modalConfirmacao?.classList.contains('active')) {
+        fecharModalConfirmacao();
+      }
+      // Fechar modal de relatório
+      else if (modalRelatorio?.classList.contains('active')) {
+        fecharModalRelatorio();
+      }
+    }
+  });
 
   // Aguardar Firebase estar pronto
   const aguardarFirebase = setInterval(() => {
@@ -1177,12 +1207,12 @@ function abrirModalAtribuicao(id) {
       <label for="selectTecnico">Selecione o Técnico *</label>
       <select id="selectTecnico" required>
         <option value="PENDENTE" disabled selected>Selecione um técnico...</option>
-        <option value="LAIS">Laís</option>
-        <option value="LAIZE">Laize</option>
-        <option value="VALESKA">Valeska</option>
-        <option value="LIZABETH">Lizabeth</option>
-        <option value="ISMAEL">Ismael</option>
-        <option value="FERNANDO">Fernando</option>
+        <option value="LAIS">Laís Mendes</option>
+        <option value="LAIZE">Laize Rodrigues</option>
+        <option value="VALESKA">Valeska Soares</option>
+        <option value="LIZABETH">Lizabeth Silva</option>
+        <option value="ISMAEL">Ismael Alves</option>
+        <option value="FERNANDO">Fernando Sousa</option>
       </select>
     </div>
 
@@ -1243,14 +1273,14 @@ function confirmarExclusao(id) {
   if (!solicitacao || !conteudoConfirmacao) return;
 
   conteudoConfirmacao.innerHTML = `
-    <p><strong>ðŸ—‘ï¸ Confirmar Exclusào</strong></p>
+    <p><strong>Confirmar Exclusào</strong></p>
     <p style="margin-top: 8px;">
       Tem certeza que deseja excluir a Solicitaçào #${id} de ${escapeHtml(
         solicitacao.cliente || ""
       )}?
     </p>
     <p style="margin-top: 8px; color: var(--warning);">
-      âš ï¸ Esta açào Nào pode ser desfeita!
+      Esta açào Nào pode ser desfeita!
     </p>
     <div class="btn-group" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
