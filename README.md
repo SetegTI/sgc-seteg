@@ -127,18 +127,18 @@ Acesse: `http://localhost:8080/public/index.html`
 ## 🔑 Códigos de Acesso
 
 ### Gestor
-- **Código**: `482913`
+- **Código**: `48****`
 - **Permissões**: Acesso total ao sistema
 
 ### Técnicos
 | Nome | Código |
 |------|--------|
-| Laís | 739156 |
-| Laize | 885412 |
-| Valeska | 605284 |
-| Lizabeth | 918347 |
-| Ismael | 274690 |
-| Fernando | 563821 |
+| Laís | 73**** |
+| Laize | 88**** |
+| Valeska | 60**** |
+| Lizabeth | 91**** |
+| Ismael | 27**** |
+| Fernando | 56**** |
 
 > ⚠️ **Nota**: Os códigos de acesso serão migrados para autenticação via PostgreSQL em versões futuras.
 
@@ -221,7 +221,7 @@ Na Fila → Processando → Aguardando Dados → Finalizado
 
 ## 📄 Licença
 
-Este projeto é propriedade da SETEG - Superintendência Estadual do Meio Ambiente do Ceará.
+Este projeto é propriedade da SETEG.
 
 ## 👥 Equipe
 
