@@ -225,8 +225,7 @@ Este projeto é propriedade da SETEG - Superintendência Estadual do Meio Ambien
 
 ## 👥 Equipe
 
-- **Desenvolvimento**: Kiro AI Assistant
-- **Cliente**: SETEG-CE
+- **Desenvolvimento**: Laís Mendes - Ricardo Junior
 
 ## 📞 Suporte
 
@@ -234,5 +233,5 @@ Para suporte e dúvidas, entre em contato com a equipe de TI da SETEG.
 
 ---
 
-**Versão**: 1.0.0  
+**Versão**: 2.0.0  
 **Última Atualização**: Março 2026
