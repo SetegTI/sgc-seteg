@@ -16,30 +16,30 @@ function restaurarLogin() {
       const dados = JSON.parse(loginSalvo);
       if (dados.tipo === 'gestor') {
         acessoGestor = true;
-        // Mostrar painel do gestor
-        setTimeout(() => {
-          const painelGestor = document.getElementById("painelGestor");
-          if (painelGestor) painelGestor.style.display = "block";
-          
-          const painelTecnico = document.getElementById("painelTecnico");
-          if (painelTecnico) painelTecnico.style.display = "none";
-        }, 100);
       } else if (dados.tipo === 'tecnico' && dados.tecnico) {
         acessoTecnico = true;
         tecnicoLogado = dados.tecnico;
-        // Mostrar painel do técnico
-        setTimeout(() => {
-          const painelTecnico = document.getElementById("painelTecnico");
-          if (painelTecnico) painelTecnico.style.display = "block";
-          
-          const painelGestor = document.getElementById("painelGestor");
-          if (painelGestor) painelGestor.style.display = "none";
-        }, 100);
       }
-      atualizarIndicadorLogin();
     } catch (e) {
       console.error("Erro ao restaurar sessão:", e);
     }
+  }
+}
+
+// Mostrar painéis após restaurar login
+function mostrarPaineisLogin() {
+  if (acessoGestor) {
+    const painelGestor = document.getElementById("painelGestor");
+    if (painelGestor) painelGestor.style.display = "block";
+    
+    const painelTecnico = document.getElementById("painelTecnico");
+    if (painelTecnico) painelTecnico.style.display = "none";
+  } else if (acessoTecnico && tecnicoLogado) {
+    const painelTecnico = document.getElementById("painelTecnico");
+    if (painelTecnico) painelTecnico.style.display = "block";
+    
+    const painelGestor = document.getElementById("painelGestor");
+    if (painelGestor) painelGestor.style.display = "none";
   }
 }
 
@@ -398,6 +398,10 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Firebase: Falha ao inicializar");
     }
   }, 5000);
+  
+  // Mostrar painéis após DOM estar pronto
+  mostrarPaineisLogin();
+  atualizarIndicadorLogin();
 });
 
 // Theme Toggle
