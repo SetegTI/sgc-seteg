@@ -555,10 +555,10 @@ function toggleTipoMapaOutros() {
 }
 
 function toggleARTResponsavel() {
-  const select = document.getElementById("artNecessaria");
-  const campo = document.getElementById("campoARTResponsavel");
-  if (campo) {
-    campo.style.display = select?.value === "sim" ? "block" : "none";
+  const radioSim = document.querySelector('input[name="artNecessaria"][value="sim"]');
+  const campo = document.getElementById("artResponsavelContainer");
+  if (campo && radioSim) {
+    campo.style.display = radioSim.checked ? "block" : "none";
   }
 }
 
@@ -1314,6 +1314,21 @@ function abrirModalAtribuicao(id) {
   // Aplicar máscara no campo de data após o modal ser aberto
   setTimeout(() => {
     aplicarMascaraData(document.getElementById("inputDataConclusao"));
+    
+    // Adicionar evento Enter para atribuir
+    const modal = document.getElementById("modalAtribuicao");
+    if (modal) {
+      const handleEnter = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          atribuirTecnico(id);
+        }
+      };
+      
+      // Remover listener anterior se existir
+      modal.removeEventListener("keypress", handleEnter);
+      modal.addEventListener("keypress", handleEnter);
+    }
   }, 100);
 }
 
