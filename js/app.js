@@ -1043,7 +1043,7 @@ function verDetalhes(id) {
             <div class="detalhe-value">${escapeHtml(solicitacao.solicitante || "")}</div>
           </div>
           <div class="detalhe-item">
-            <div class="detalhe-label">Cliente / Requerente</div>
+            <div class="detalhe-label">Cliente - Código</div>
             <div class="detalhe-value">${escapeHtml(solicitacao.cliente || "")}</div>
           </div>
           <div class="detalhe-item">
