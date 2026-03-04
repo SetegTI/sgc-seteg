@@ -287,6 +287,7 @@ body {
   align-self: flex-start;
   max-height: calc(100vh - 32px);
   overflow-y: auto;
+  padding-bottom: 80px;
 }
 
 /* Scrollbar da sidebar */
