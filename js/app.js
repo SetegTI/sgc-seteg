@@ -436,7 +436,8 @@ function salvarSolicitacaoFirebase(dados) {
 
   runTransaction(contadorRef, (atual) => {
     return (atual || 0) + 1;
-  }).then((result) => {
+  })
+  .then((result) => {
     const novoId = result.snapshot.val();
     const { set } = window.firebaseFunctions;
     const solRef = ref(db, `solicitacoes/${novoId}`);
@@ -447,14 +448,18 @@ function salvarSolicitacaoFirebase(dados) {
       dataCriacao: new Date().toISOString(),
     })
       .then(() => {
-        mostrarNotificacao("Solicitaçào criada com sucesso!", "success");
+        mostrarNotificacao("Solicitação criada com sucesso!", "success");
         limparForm();
         toggleForm();
       })
       .catch((err) => {
         console.error("Firebase: Erro ao salvar", err);
-        mostrarNotificacao("Erro ao salvar Solicitaçào!", "error");
+        mostrarNotificacao("Erro ao salvar solicitação!", "error");
       });
+  })
+  .catch((err) => {
+    console.error("Firebase: Erro no contador", err);
+    mostrarNotificacao("Erro: Verifique as permissões do Firebase!", "error");
   });
 }
 
@@ -519,7 +524,6 @@ function limparForm() {
   safeSetDisplay("tipoMapaOutros", "none");
   safeSetDisplay("artResponsavelContainer", "none");
   safeSetDisplay("campoElementosOutros", "none");
-  mostrarNotificacao("Campos do formulário foram limpos!", "info");
 }
 
 function toggleTipoMapaOutros() {
