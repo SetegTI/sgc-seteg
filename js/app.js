@@ -1,7 +1,5 @@
-﻿// =======================================================
-//  SGC SETEG - Sistema de Gestào Cartográfica
-//  app.js - Lógica principal da aplicaçào
-// =======================================================
+﻿// SGC SETEG - Sistema de Gestão Cartográfica
+// app.js - Lógica principal da aplicação
 
 // Variáveis globais
 let solicitacoes = [];
@@ -18,15 +16,13 @@ function restaurarLogin() {
       const dados = JSON.parse(loginSalvo);
       if (dados.tipo === 'gestor') {
         acessoGestor = true;
-        console.log("✅ Login de gestor restaurado");
       } else if (dados.tipo === 'tecnico' && dados.tecnico) {
         acessoTecnico = true;
         tecnicoLogado = dados.tecnico;
-        console.log("✅ Login de técnico restaurado:", tecnicoLogado);
       }
       atualizarIndicadorLogin();
     } catch (e) {
-      console.error("Erro ao restaurar login:", e);
+      console.error("Erro ao restaurar sessão:", e);
     }
   }
 }
@@ -42,17 +38,6 @@ function salvarLogin(tipo, tecnico = null) {
 function limparLogin() {
   localStorage.removeItem('sgc_login');
 }
-
-// Códigos de acesso
-const CODIGO_GESTOR = "482913";
-const CODIGOS_TECNICOS = {
-  LAIS: "739156",
-  LAIZE: "885412",
-  VALESKA: "605284",
-  LIZABETH: "918347",
-  ISMAEL: "274690",
-  FERNANDO: "563821",
-};
 
 // Referências DOM
 let formSolicitacao,
@@ -71,9 +56,7 @@ let formSolicitacao,
   estatisticasTecnico,
   tabBtns;
 
-// =======================================================
-//  FUNÇÕES AUXILIARES
-// =======================================================
+// Funções Auxiliares
 function escapeHtml(str) {
   if (!str) return "";
   const div = document.createElement("div");
@@ -269,9 +252,7 @@ function calcularDataConclusao(dataInicio, prazoDias) {
   return data.toISOString().split("T")[0];
 }
 
-// =======================================================
-//  INICIALIZAÇÃO
-// =======================================================
+// Inicialização
 document.addEventListener("DOMContentLoaded", () => {
   // Carregar tema salvo
   currentTheme = localStorage.getItem('theme') || 'dark';
@@ -376,7 +357,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.dbRef && window.firebaseFunctions) {
       clearInterval(aguardarFirebase);
       carregarSolicitacoesFirebase();
-      console.log("✅ App inicializado com Firebase");
     }
   }, 100);
 
@@ -384,14 +364,12 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     clearInterval(aguardarFirebase);
     if (!window.dbRef) {
-      console.error("❌ Firebase nào carregou!");
+      console.error("Firebase: Falha ao inicializar");
     }
   }, 5000);
 });
 
-// =======================================================
-//  THEME TOGGLE (Dark/Light Mode)
-// =======================================================
+// Theme Toggle
 function toggleTheme() {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   applyTheme(currentTheme);
@@ -411,15 +389,13 @@ function applyTheme(theme) {
   }
 }
 
-// =======================================================
-//  FIREBASE - CRUD
-// =======================================================
+// Firebase - CRUD
 function carregarSolicitacoesFirebase() {
   const { onValue } = window.firebaseFunctions;
   const dbRef = window.dbRef;
 
   if (!dbRef || !onValue) {
-    console.error("Firebase Nào inicializado!");
+    console.error("Firebase: Não inicializado");
     return;
   }
 
@@ -461,7 +437,7 @@ function salvarSolicitacaoFirebase(dados) {
         toggleForm();
       })
       .catch((err) => {
-        console.error("Erro ao salvar:", err);
+        console.error("Firebase: Erro ao salvar", err);
         mostrarNotificacao("Erro ao salvar Solicitaçào!", "error");
       });
   });
@@ -475,10 +451,10 @@ function atualizarSolicitacaoFirebase(id, dados) {
 
   update(solRef, dados)
     .then(() => {
-      console.log(`Solicitaçào #${id} atualizada`);
+      // Atualização bem-sucedida
     })
     .catch((err) => {
-      console.error("Erro ao atualizar:", err);
+      console.error("Firebase: Erro ao atualizar", err);
       mostrarNotificacao("Erro ao atualizar!", "error");
     });
 }
@@ -501,14 +477,12 @@ function excluirSolicitacao(id) {
       mostrarNotificacao(`Solicitaçào #${id} excluída!`, "success");
     })
     .catch((err) => {
-      console.error("Erro ao excluir:", err);
+      console.error("Firebase: Erro ao excluir", err);
       mostrarNotificacao("Erro ao excluir!", "error");
     });
 }
 
-// =======================================================
-//  FORMULÁRIO
-// =======================================================
+// Formulário
 function toggleForm() {
   const formSection = document.querySelector(".form-section");
   const btnToggle = document.getElementById("btnToggleForm");
@@ -620,9 +594,7 @@ function salvarSolicitacao(e) {
   salvarSolicitacaoFirebase(dados);
 }
 
-// =======================================================
-//  ACESSO GESTOR / TÉCNICO
-// =======================================================
+// Acesso Gestor / Técnico
 function atualizarIndicadorLogin() {
   const indicator = document.getElementById("loginIndicator");
   const loginText = document.getElementById("loginText");
@@ -662,20 +634,116 @@ function fecharModalAcessoGestor() {
   if (input) input.value = "";
 }
 
-function validarCodigoAcesso() {
-  const codigo = document.getElementById("codigoAcesso")?.value.trim();
-  if (codigo === CODIGO_GESTOR) {
-    acessoGestor = true;
-    fecharModalAcessoGestor();
-    salvarLogin('gestor');
-    mostrarNotificacao("Acesso de gestor concedido!", "success");
-    atualizarListaTecnicos();
-    atualizarIndicadorLogin();
-  } else {
-    mostrarNotificacao("Código incorreto!", "error");
+// Autenticação com Firebase
+async function verificarCodigoFirebase(codigoDigitado) {
+  if (!codigoDigitado) {
+    mostrarNotificacao("Digite um código!", "warning");
+    return null;
+  }
+
+  try {
+    const caminho = `acessos/${codigoDigitado}`;
+    
+    const snapshot = await window.firebaseFunctions.get(
+      window.firebaseFunctions.ref(window.db, caminho)
+    );
+    
+    if (snapshot.exists()) {
+      const dados = snapshot.val();
+      
+      return {
+        codigo: codigoDigitado,
+        role: dados.role || "tecnico",
+        nome: dados.nome || "",
+        codigoTecnico: dados.codigo || ""
+      };
+    } else {
+      mostrarNotificacao("Código inválido!", "error");
+      return null;
+    }
+    
+  } catch (error) {
+    console.error("Auth: Erro ao verificar acesso", error);
+    mostrarNotificacao("Erro ao verificar acesso. Tente novamente.", "error");
+    return null;
   }
 }
 
+async function validarCodigoAcesso() {
+  const codigo = document.getElementById("codigoAcesso")?.value.trim();
+  const usuario = await verificarCodigoFirebase(codigo);
+  
+  if (!usuario) {
+    return;
+  }
+  
+  if (usuario.role !== 'gestor') {
+    mostrarNotificacao("Este código não é de gestor!", "error");
+    return;
+  }
+  
+  // Login como gestor
+  acessoGestor = true;
+  salvarLogin('gestor');
+  mostrarNotificacao("Acesso de gestor concedido!", "success");
+  fecharModalAcessoGestor();
+  atualizarIndicadorLogin();
+  atualizarListaTecnicos();
+  
+  // Mostrar painel do gestor
+  const painelGestor = document.getElementById("painelGestor");
+  if (painelGestor) painelGestor.style.display = "block";
+  
+  // Esconder painel do técnico
+  const painelTecnico = document.getElementById("painelTecnico");
+  if (painelTecnico) painelTecnico.style.display = "none";
+}
+
+async function validarAcessoTecnico() {
+  const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
+  const tecnicoSelecionado = document.getElementById("selectTecnicoAcesso")?.value;
+  
+  if (!tecnicoSelecionado) {
+    mostrarNotificacao("Selecione seu nome primeiro!", "warning");
+    return;
+  }
+  
+  const usuario = await verificarCodigoFirebase(codigo);
+  
+  if (!usuario) {
+    return;
+  }
+  
+  if (usuario.role !== 'tecnico') {
+    mostrarNotificacao("Este código não é de técnico!", "error");
+    return;
+  }
+  
+  // Verificar se o código corresponde ao técnico selecionado
+  if (usuario.codigoTecnico !== tecnicoSelecionado) {
+    mostrarNotificacao(`Este código não pertence a ${formatarNomeTecnico(tecnicoSelecionado)}!`, "error");
+    return;
+  }
+  
+  // Login como técnico
+  acessoTecnico = true;
+  tecnicoLogado = usuario.codigoTecnico || usuario.nome;
+  salvarLogin('tecnico', tecnicoLogado);
+  mostrarNotificacao(`Bem-vindo(a), ${usuario.nome || formatarNomeTecnico(tecnicoLogado)}!`, "success");
+  fecharModalAcessoTecnico();
+  atualizarIndicadorLogin();
+  atualizarTabela();
+  atualizarEstatisticas();
+  atualizarEstatisticasTecnico();
+  
+  // Mostrar painel do técnico
+  const painelTecnico = document.getElementById("painelTecnico");
+  if (painelTecnico) painelTecnico.style.display = "block";
+  
+  // Esconder painel do gestor
+  const painelGestor = document.getElementById("painelGestor");
+  if (painelGestor) painelGestor.style.display = "none";
+}
 
 function abrirModalAcessoTecnico() {
   // Bloquear se já estiver logado como gestor
@@ -693,31 +761,6 @@ function fecharModalAcessoTecnico() {
   if (input) input.value = "";
 }
 
-function validarAcessoTecnico() {
-  const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
-  
-  const tecnico = Object.keys(CODIGOS_TECNICOS).find(
-    (t) => CODIGOS_TECNICOS[t] === codigo
-  );
-
-  if (tecnico) {
-    acessoTecnico = true;
-    tecnicoLogado = tecnico;
-    fecharModalAcessoTecnico();
-    salvarLogin('tecnico', tecnico);
-    mostrarNotificacao(
-      `Bem-vindo(a), ${formatarNomeTecnico(tecnico)}!`,
-      "success"
-    );
-    atualizarTabela();
-    atualizarEstatisticas();
-    atualizarEstatisticasTecnico();
-    atualizarIndicadorLogin();
-  } else {
-    mostrarNotificacao("Código incorreto!", "error");
-  }
-}
-
 
 function fazerLogout() {
   acessoGestor = false;
@@ -732,9 +775,7 @@ function fazerLogout() {
   atualizarIndicadorLogin();
 }
 
-// =======================================================
-//  TABELA
-// =======================================================
+// Tabela
 function atualizarTabela(filtroStatus = null) {
   if (!tabelaSolicitacoes) return;
 
@@ -786,27 +827,17 @@ function atualizarTabela(filtroStatus = null) {
   tabelaSolicitacoes.innerHTML = html;
 }
 
-// =======================================================
-//  DETALHES DA SOLICITAÇÃO
-// =======================================================
+// Detalhes da Solicitação
 function verDetalhes(id) {
-  console.log("🔍 Abrindo detalhes - ID:", id);
-  console.log("🔍 acessoGestor:", acessoGestor);
-  console.log("🔍 acessoTecnico:", acessoTecnico);
-  console.log("🔍 tecnicoLogado:", tecnicoLogado);
-  
   const solicitacao = solicitacoes.find((s) => s.id == id);
   
-  console.log("📦 Dados completos da solicitação:", solicitacao);
-  
   if (!solicitacao) {
-    console.error("❌ Solicitação não encontrada!");
     mostrarNotificacao("Solicitação não encontrada!", "error");
     return;
   }
   
   if (!conteudoDetalhes) {
-    console.error("❌ conteudoDetalhes não encontrado!");
+    console.error("Elemento conteudoDetalhes não encontrado");
     return;
   }
 
@@ -879,9 +910,7 @@ function verDetalhes(id) {
       </div>
 
       ${(() => {
-        console.log("🔍 Verificando acessoGestor no template:", acessoGestor);
         if (acessoGestor) {
-          console.log("✅ Renderizando seção Ações do Gestor");
           return `
       <!-- Seção: Ações do Gestor -->
       <div class="detalhe-section" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2);">
@@ -917,7 +946,6 @@ function verDetalhes(id) {
       </div>
           `;
         } else if (acessoTecnico && solicitacao.tecnicoResponsavel === tecnicoLogado) {
-          console.log("✅ Renderizando seção Ações do Técnico");
           return `
       <!-- Seção: Ações do Técnico -->
       <div class="detalhe-section" style="background: rgba(234, 179, 8, 0.05); border: 1px solid rgba(234, 179, 8, 0.2);">
@@ -944,7 +972,6 @@ function verDetalhes(id) {
       </div>
           `;
         } else {
-          console.log("❌ Nenhuma seção de ações renderizada");
           return '';
         }
       })()}
@@ -1089,31 +1116,23 @@ function fecharModal() {
 }
 
 function mudarStatus(id, novoStatus) {
-  console.log("🔄 mudarStatus chamado - ID:", id, "Novo Status:", novoStatus);
-  console.log("📋 Array solicitacoes:", solicitacoes.map(s => ({ id: s.id, tipo: typeof s.id })));
-  
   if (!novoStatus) {
-    console.log("❌ Nenhum status selecionado");
     mostrarNotificacao("Selecione um estágio!", "warning");
     return;
   }
   
   if (!acessoGestor && !acessoTecnico) {
-    console.log("❌ Sem permissão - acessoGestor:", acessoGestor, "acessoTecnico:", acessoTecnico);
     mostrarNotificacao("Faça login para alterar status!", "warning");
     return;
   }
 
   const solicitacao = solicitacoes.find((s) => s.id == id);
-  console.log("📦 Solicitação encontrada:", solicitacao);
   
   if (!solicitacao) {
-    console.log("❌ Solicitação não encontrada");
     return;
   }
 
   if (acessoTecnico && solicitacao.tecnicoResponsavel !== tecnicoLogado) {
-    console.log("❌ Técnico não autorizado");
     mostrarNotificacao(
       "Você só pode alterar solicitações atribuídas a você!",
       "warning"
@@ -1121,7 +1140,6 @@ function mudarStatus(id, novoStatus) {
     return;
   }
 
-  console.log("✅ Atualizando status no Firebase...");
   atualizarSolicitacaoFirebase(id, { status: novoStatus });
 
   const mensagem = {
@@ -1405,7 +1423,8 @@ function gerarRelatorio() {
 
   const foraPrazo = finalizadas - dentroPrazo;
 
-  const tecnicos = Object.keys(CODIGOS_TECNICOS);
+  // Lista de técnicos conhecidos
+  const tecnicos = ["LAIS", "LAIZE", "VALESKA", "LIZABETH", "ISMAEL", "FERNANDO"];
   const estatisticasTecnicos = {};
 
   tecnicos.forEach((tecnico) => {
@@ -1649,7 +1668,8 @@ function atualizarListaTecnicos() {
     return;
   }
 
-  const tecnicos = Object.keys(CODIGOS_TECNICOS);
+  // Lista de técnicos conhecidos
+  const tecnicos = ["LAIS", "LAIZE", "VALESKA", "LIZABETH", "ISMAEL", "FERNANDO"];
   let html = "";
 
   tecnicos.forEach((tecnico) => {

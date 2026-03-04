@@ -1,6 +1,3 @@
-// Pequenos utilitários de DOM podem ser extraídos para cá futuramente.
-// Mantido apenas como ponto de extensão da arquitetura.
-
 export function qs(selector, root = document) {
   return root.querySelector(selector);
 }
