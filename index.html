@@ -96,8 +96,8 @@
 
               <div class="row">
                 <div class="form-group">
-                  <label for="cliente">Cliente / Requerente *</label>
-                  <input type="text" id="cliente" name="cliente" placeholder="Nome do cliente" required />
+                  <label for="cliente">Cliente - Código *</label>
+                  <input type="text" id="cliente" name="cliente" placeholder="Nome do cliente e código da empresa" required />
                 </div>
 
                 <div class="form-group">
@@ -174,7 +174,7 @@
 
                 <div class="form-group" id="tipoMapaOutros" style="display: none;">
                   <label for="tipoMapaOutrosTexto">Especifique o Tipo de Mapa *</label>
-                  <input type="text" id="tipoMapaOutrosTexto" placeholder="Digite o nome do mapa" />
+                  <input type="text" id="tipoMapaOutrosTexto" name="tipoMapaOutrosTexto" placeholder="Digite o nome do mapa" />
                 </div>
               </div>
 
@@ -256,29 +256,29 @@
                 <label>Elementos:</label>
                 <div class="checkbox-group">
                   <div class="checkbox-item">
-                    <input type="checkbox" id="elementoLocalizacao" />
+                    <input type="checkbox" id="elementoLocalizacao" name="elementoLocalizacao" />
                     <label for="elementoLocalizacao">Localização</label>
                   </div>
                   <div class="checkbox-item">
-                    <input type="checkbox" id="elementoAcessoLocal" />
-                    <label for="elementosAcessoLocal">Via de Acesso Local</label>
+                    <input type="checkbox" id="elementoAcessoLocal" name="elementoAcessoLocal" />
+                    <label for="elementoAcessoLocal">Via de Acesso Local</label>
                   </div>
                   <div class="checkbox-item">
-                    <input type="checkbox" id="elementosAcessoRegional" name="elementosAcessoRegional" />
-                    <label for="elementosAcessoRegional">Via de Acesso Regional</label>
+                    <input type="checkbox" id="elementoAcessoRegional" name="elementoAcessoRegional" />
+                    <label for="elementoAcessoRegional">Via de Acesso Regional</label>
                   </div>
                   <div class="checkbox-item">
-                    <input type="checkbox" id="elementosAreaAmostral" name="elementosAreaAmostral" />
-                    <label for="elementosAreaAmostral">Área Amostral</label>
+                    <input type="checkbox" id="elementoAreaAmostral" name="elementoAreaAmostral" />
+                    <label for="elementoAreaAmostral">Área Amostral</label>
                   </div>
                   <div class="checkbox-item">
-                    <input type="checkbox" id="elementosOutros" name="elementosOutros" onclick="toggleElementosOutros()" />
-                    <label for="elementosOutros">Outros</label>
+                    <input type="checkbox" id="elementoOutros" name="elementoOutros" onclick="toggleElementosOutros()" />
+                    <label for="elementoOutros">Outros</label>
                   </div>
                 </div>
 
                 <div id="campoElementosOutros" style="display: none; margin-top: 10px;">
-                  <input type="text" id="elementosOutrosTexto" name="elementosOutrosTexto" placeholder="Especifique outros elementos" class="input-inline" />
+                  <input type="text" id="elementoOutrosTexto" name="elementoOutrosTexto" placeholder="Especifique outros elementos" class="input-inline" />
                 </div>
               </div>
 
@@ -336,6 +336,41 @@
 
       <!-- Sidebar -->
       <aside class="sidebar" aria-label="Painel lateral">
+        <!-- Painel Gestor -->
+        <div id="painelGestor" class="card" style="display: none;">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-clipboard-check"></i> Painel do Gestor</h3>
+          </div>
+          <div class="form-group">
+            <label><strong>Técnicos e Projetos:</strong></label>
+            <div id="listaTecnicos" class="tecnico-list"></div>
+          </div>
+          <div class="btn-group" style="margin-top: 20px;">
+            <button class="btn btn-success btn-block" type="button" onclick="abrirModalRelatorio()">
+              <i class="bi bi-bar-chart"></i> Gerar Relatório
+            </button>
+            <button class="btn btn-warning btn-block" type="button" onclick="exportarTodosDados()">
+              <i class="bi bi-download"></i> Exportar CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Painel Técnico -->
+        <div id="painelTecnico" class="card" style="display: none;">
+          <div class="card-header">
+            <h3 class="card-title" id="tituloPainelTecnico"><i class="bi bi-person-badge"></i> Painel do Técnico</h3>
+          </div>
+          <div class="form-group" style="margin-top: 15px;">
+            <label><strong>Estatísticas:</strong></label>
+            <div id="estatisticasTecnico"></div>
+          </div>
+          <div class="btn-group" style="margin-top: 20px;">
+            <button class="btn btn-primary btn-block" type="button" onclick="atualizarTabela('todas')">
+              <i class="bi bi-arrow-clockwise"></i> Atualizar Lista
+            </button>
+          </div>
+        </div>
+
         <div class="stats-card">
           <div class="stats-label">Total de Solicitações</div>
           <div class="stats-number" id="totalSolicitacoes">0</div>
@@ -379,53 +414,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Painel Gestor -->
-        <div id="painelGestor" class="card" style="display: none;">
-          <div class="card-header">
-            <h3 class="card-title"><i class="bi bi-clipboard-check"></i> Painel do Gestor</h3>
-          </div>
-          <div class="form-group">
-            <label><strong>Filtros Rápidos:</strong></label>
-            <button class="btn btn-block btn-info" type="button" onclick="filtrarSolicitacoes('em_andamento')">Solicitações em Andamento</button>
-            <button class="btn btn-block btn-warning" type="button" onclick="filtrarSolicitacoes('na_fila')">Solicitações na Fila</button>
-            <button class="btn btn-block btn-ghost" type="button" onclick="filtrarSolicitacoes('aguardando_dados')">Aguardando Dados</button>
-          </div>
-          <div class="form-group" style="margin-top: 15px;">
-            <label><strong>Técnicos e Projetos:</strong></label>
-            <div id="listaTecnicos" class="tecnico-list"></div>
-          </div>
-          <div class="btn-group" style="margin-top: 20px;">
-            <button class="btn btn-success btn-block" type="button" onclick="abrirModalRelatorio()">
-              <i class="bi bi-bar-chart"></i> Gerar Relatório
-            </button>
-            <button class="btn btn-warning btn-block" type="button" onclick="exportarTodosDados()">
-              <i class="bi bi-download"></i> Exportar Todos os Dados
-            </button>
-          </div>
-        </div>
-
-        <!-- Painel Técnico -->
-        <div id="painelTecnico" class="card" style="display: none;">
-          <div class="card-header">
-            <h3 class="card-title" id="tituloPainelTecnico"><i class="bi bi-person-badge"></i> Painel do Técnico</h3>
-          </div>
-          <div class="form-group">
-            <label><strong>Minhas Solicitações:</strong></label>
-            <button class="btn btn-block btn-warning" type="button" onclick="filtrarMinhasSolicitacoes('processando')">Em Processamento</button>
-            <button class="btn btn-block btn-info" type="button" onclick="filtrarMinhasSolicitacoes('aguardando')">Aguardando Dados</button>
-            <button class="btn btn-block btn-success" type="button" onclick="filtrarMinhasSolicitacoes('finalizadas')">Finalizadas</button>
-          </div>
-          <div class="form-group" style="margin-top: 15px;">
-            <label><strong>Estatísticas:</strong></label>
-            <div id="estatisticasTecnico"></div>
-          </div>
-          <div class="btn-group" style="margin-top: 20px;">
-            <button class="btn btn-primary btn-block" type="button" onclick="atualizarTabela('todas')">
-              <i class="bi bi-arrow-clockwise"></i> Atualizar Lista
-            </button>
-          </div>
-        </div>
       </aside>
     </main>
   </div>
@@ -452,7 +440,12 @@
         <p><strong>Digite o código de acesso para visualizar funções administrativas:</strong></p>
         <div class="form-group" style="margin-top: 16px;">
           <label for="codigoAcesso">Código de Acesso *</label>
-          <input type="password" id="codigoAcesso" placeholder="••••••" maxlength="6" inputmode="numeric" />
+          <div style="position: relative;">
+            <input type="password" id="codigoAcesso" placeholder="••••••" maxlength="6" inputmode="numeric" style="padding-right: 40px;" />
+            <button type="button" onclick="togglePasswordVisibility('codigoAcesso', 'toggleIconGestor')" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px 8px; color: var(--text-secondary);">
+              <i id="toggleIconGestor" class="bi bi-eye" style="font-size: 1.2rem;"></i>
+            </button>
+          </div>
           <small class="help">Apenas gestores possuem este código</small>
         </div>
         <div class="btn-group" style="margin-top: 16px;">
@@ -486,7 +479,12 @@
         </div>
         <div class="form-group" style="margin-top: 12px;">
           <label for="codigoAcessoTecnico">Código de Acesso *</label>
-          <input type="password" id="codigoAcessoTecnico" placeholder="••••••" maxlength="6" inputmode="numeric" />
+          <div style="position: relative;">
+            <input type="password" id="codigoAcessoTecnico" placeholder="••••••" maxlength="6" inputmode="numeric" style="padding-right: 40px;" />
+            <button type="button" onclick="togglePasswordVisibility('codigoAcessoTecnico', 'toggleIconTecnico')" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px 8px; color: var(--text-secondary);">
+              <i id="toggleIconTecnico" class="bi bi-eye" style="font-size: 1.2rem;"></i>
+            </button>
+          </div>
           <small class="help">Digite seu código pessoal</small>
         </div>
         <div class="btn-group" style="margin-top: 16px;">

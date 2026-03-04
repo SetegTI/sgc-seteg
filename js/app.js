@@ -1,4 +1,4 @@
-﻿// SGC SETEG - Sistema de Gestão Cartográfica
+// SGC SETEG - Sistema de Gestão Cartográfica
 // app.js - Lógica principal da aplicação
 
 // Variáveis globais
@@ -307,6 +307,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnLimparForm = document.getElementById("btnLimparForm");
   btnLimparForm?.addEventListener("click", limparForm);
   
+  // Event listeners para campos condicionais
+  const tipoMapaSelect = document.getElementById("tipoMapa");
+  tipoMapaSelect?.addEventListener("change", toggleTipoMapaOutros);
+  
+  const artNecessariaRadios = document.querySelectorAll('input[name="artNecessaria"]');
+  artNecessariaRadios.forEach(radio => {
+    radio.addEventListener("change", toggleARTResponsavel);
+  });
+  
   // Tabs de filtro
   tabBtns.forEach((btn, index) => {
     btn.addEventListener("click", () => {
@@ -499,8 +508,8 @@ function toggleForm() {
 
 function limparForm() {
   formSolicitacao?.reset();
-  safeSetDisplay("campoTipoMapaOutros", "none");
-  safeSetDisplay("campoARTResponsavel", "none");
+  safeSetDisplay("tipoMapaOutros", "none");
+  safeSetDisplay("artResponsavelContainer", "none");
   safeSetDisplay("campoElementosOutros", "none");
   mostrarNotificacao("Campos do formulário foram limpos!", "info");
 }
@@ -522,7 +531,7 @@ function toggleARTResponsavel() {
 }
 
 function toggleElementosOutros() {
-  const checkbox = document.getElementById("elementosOutros");
+  const checkbox = document.getElementById("elementoOutros");
   const campo = document.getElementById("campoElementosOutros");
   if (campo) {
     campo.style.display = checkbox?.checked ? "block" : "none";
@@ -531,6 +540,11 @@ function toggleElementosOutros() {
 
 function salvarSolicitacao(e) {
   e.preventDefault();
+  
+  if (!window.db || !window.firebaseFunctions) {
+    mostrarNotificacao("Firebase não está pronto. Aguarde...", "warning");
+    return;
+  }
   
   // Verificar se o formulário é válido
   const form = e.target;
@@ -557,7 +571,7 @@ function salvarSolicitacao(e) {
     localidade: formData.get("localidade"),
     municipio: formData.get("municipio"),
     tipoMapa: formData.get("tipoMapa"),
-    nomeTipoMapa: formData.get("nomeTipoMapa") || "",
+    nomeTipoMapa: formData.get("tipoMapaOutrosTexto") || "",
     finalidade: formData.get("finalidade"),
     artNecessaria: formData.get("artNecessaria"),
     artResponsavel: formData.get("artResponsavel") || "",
@@ -576,12 +590,12 @@ function salvarSolicitacao(e) {
       kml: formData.get("produtoKML") === "on",
     },
     elementos: {
-      localizacao: formData.get("elementosLocalizacao") === "on",
-      acessoLocal: formData.get("elementosAcessoLocal") === "on",
-      acessoRegional: formData.get("elementosAcessoRegional") === "on",
-      areaAmostral: formData.get("elementosAreaAmostral") === "on",
-      outros: formData.get("elementosOutros") === "on",
-      outrosTexto: formData.get("elementosOutrosTexto") || "",
+      localizacao: formData.get("elementoLocalizacao") === "on",
+      acessoLocal: formData.get("elementoAcessoLocal") === "on",
+      acessoRegional: formData.get("elementoAcessoRegional") === "on",
+      areaAmostral: formData.get("elementoAreaAmostral") === "on",
+      outros: formData.get("elementoOutros") === "on",
+      outrosTexto: formData.get("elementoOutrosTexto") || "",
     },
   };
 
@@ -600,21 +614,25 @@ function atualizarIndicadorLogin() {
   const loginText = document.getElementById("loginText");
   const btnGestor = document.getElementById("btnAcessoGestor");
   const btnTecnico = document.getElementById("btnAcessoTecnico");
+  const cardNovaSolicitacao = document.getElementById("cardNovaSolicitacao");
   
   if (acessoGestor) {
     indicator.style.display = "flex";
     loginText.innerHTML = '<i class="bi bi-shield-lock"></i> Logado como <strong>Gestor</strong>';
     btnGestor.style.display = "none";
     btnTecnico.style.display = "none";
+    if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
   } else if (acessoTecnico && tecnicoLogado) {
     indicator.style.display = "flex";
     loginText.innerHTML = `<i class="bi bi-person-circle"></i> Logado como <strong>${formatarNomeTecnico(tecnicoLogado)}</strong>`;
     btnGestor.style.display = "none";
     btnTecnico.style.display = "none";
+    if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
   } else {
     indicator.style.display = "none";
     btnGestor.style.display = "inline-flex";
     btnTecnico.style.display = "inline-flex";
+    if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "block";
   }
 }
 
@@ -768,6 +786,14 @@ function fazerLogout() {
   tecnicoLogado = null;
   limparLogin();
   mostrarNotificacao("Logout realizado!", "info");
+  
+  // Esconder painéis
+  const painelGestor = document.getElementById("painelGestor");
+  if (painelGestor) painelGestor.style.display = "none";
+  
+  const painelTecnico = document.getElementById("painelTecnico");
+  if (painelTecnico) painelTecnico.style.display = "none";
+  
   atualizarTabela();
   atualizarEstatisticas();
   atualizarListaTecnicos();
@@ -1474,7 +1500,7 @@ function gerarRelatorio() {
     </div>
 
     <div class="relatorio-item">
-      <h4 class="panel-card-title">ðŸ‘¨â€ðŸ’¼ Por Técnico</h4>
+      <h4 class="panel-card-title"> Por Técnico</h4>
   `;
 
   tecnicos.forEach((tecnico) => {
@@ -1521,7 +1547,7 @@ function gerarRelatorio() {
       <button class="btn btn-ghost" type="button" onclick="fecharModalRelatorio()">Fechar</button>
       <button class="btn btn-info" type="button" onclick="exportarRelatorioCompleto('${escapeAttr(
         dataInicio
-      )}', '${escapeAttr(dataFim)}')">ðŸ“¥ Exportar CSV</button>
+      )}', '${escapeAttr(dataFim)}')"> Exportar CSV</button>
     </div>
   `;
 
@@ -1844,3 +1870,20 @@ window.toggleTheme = toggleTheme;
 
 
 
+
+
+// Toggle de visibilidade de senha
+function togglePasswordVisibility(inputId, iconId) {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  
+  if (!input || !icon) return;
+  
+  if (input.type === "password") {
+    input.type = "text";
+    icon.className = "bi bi-eye-slash";
+  } else {
+    input.type = "password";
+    icon.className = "bi bi-eye";
+  }
+}
