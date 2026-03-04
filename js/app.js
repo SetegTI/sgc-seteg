@@ -1,4 +1,4 @@
-// SGC SETEG - Sistema de Gestão Cartográfica
+﻿// SGC SETEG - Sistema de Gestão Cartográfica
 // app.js - Lógica principal da aplicação
 
 // Variáveis globais
@@ -102,15 +102,15 @@ function formatarStatus(status) {
 
 function formatarTipoMapa(tipo, nomeOutro) {
   const map = {
-    planta: "Planta de Situaçào",
-    localizacao: "Mapa de Localizaçào",
+    planta: "Planta de Situação",
+    localizacao: "Mapa de Localização",
     outros: nomeOutro || "Outros",
   };
   return map[tipo] || tipo;
 }
 
 function formatarNomeTecnico(codigo) {
-  if (!codigo) return "Nào atribuído";
+  if (!codigo) return "Não atribuído";
   const nomes = {
     LAIS: "Laís",
     LAIZE: "Laíze",
@@ -304,7 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Bind eventos
   formSolicitacao?.addEventListener("submit", salvarSolicitacao);
   
-  // Botão Nova Solicitaçào
+  // Botão Nova Solicitação
   const btnToggleForm = document.getElementById("btnToggleForm");
   btnToggleForm?.addEventListener("click", toggleForm);
   
@@ -514,7 +514,7 @@ function excluirSolicitacao(id) {
     .then(() => {
       fecharModalConfirmacao();
       fecharModal();
-      mostrarNotificacao(`Solicitaçào #${id} excluída!`, "success");
+      mostrarNotificacao(`Solicitação #${id} excluída!`, "success");
     })
     .catch((err) => {
       console.error("Firebase: Erro ao excluir", err);
@@ -863,7 +863,7 @@ function atualizarTabela(filtroStatus = null) {
         <tr>
           <td>#${String(s.id).padStart(4, "0")}</td>
           <td>${escapeHtml(s.solicitante || "")}</td>
-          <td>${escapeHtml(s.nomeEstudo || "Nào informado")}</td>
+          <td>${escapeHtml(s.nomeEstudo || "Não informado")}</td>
           <td>${escapeHtml(s.cliente || "")}</td>
           <td>${escapeHtml(formatarTipoMapa(s.tipoMapa, s.nomeTipoMapa))}</td>
           <td>${escapeHtml(s.municipio || "")}</td>
@@ -906,10 +906,10 @@ function verDetalhes(id) {
   const dataConclusaoPrevista = formatDateBR(solicitacao.dataConclusaoPrevista);
   const dataConclusaoReal = solicitacao.dataConclusaoReal
     ? formatDateBR(solicitacao.dataConclusaoReal)
-    : "Nào concluída";
+    : "Não concluída";
   const dataEntrega = solicitacao.dataEntrega
     ? formatDateBR(solicitacao.dataEntrega)
-    : "Nào informado";
+    : "Não informado";
 
   let statusPrazo = "";
   if (solicitacao.status === "finalizado" && solicitacao.dataConclusaoReal) {
@@ -930,11 +930,11 @@ function verDetalhes(id) {
 
   const elementos = solicitacao.elementos || {};
   let elementosHtml = "";
-  if (elementos.localizacao) elementosHtml += "✓ Localizaçào ";
+  if (elementos.localizacao) elementosHtml += "✓ Localização ";
   if (elementos.acessoLocal) elementosHtml += "✓ Via de Acesso Local ";
   if (elementos.acessoRegional)
     elementosHtml += "✓ Via de Acesso Regional ";
-  if (elementos.areaAmostral) elementosHtml += "✓ àrea Amostral ";
+  if (elementos.areaAmostral) elementosHtml += "✓ ãrea Amostral ";
   if (elementos.outros && elementos.outrosTexto) {
     elementosHtml += `✓ Outros: ${escapeHtml(elementos.outrosTexto)} `;
   }
@@ -942,9 +942,9 @@ function verDetalhes(id) {
   conteudoDetalhes.innerHTML = `
     <div class="modal-body">
       
-      <!-- Seçào: Situaçào da Solicitaçào -->
+      <!-- Seção: Situação da Solicitação -->
       <div class="detalhe-section">
-        <h4 class="detalhe-section-title"><i class="bi bi-info-circle"></i> Situaçào da Solicitaçào</h4>
+        <h4 class="detalhe-section-title"><i class="bi bi-info-circle"></i> Situação da Solicitação</h4>
         <div class="detalhe-grid" style="grid-template-columns: repeat(4, 1fr);">
           <div class="detalhe-item">
             <div class="detalhe-label">ID</div>
@@ -1034,7 +1034,7 @@ function verDetalhes(id) {
         }
       })()}
 
-      <!-- Seçào: Dados Gerais -->
+      <!-- Seção: Dados Gerais -->
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-file-text"></i> Dados Gerais</h4>
         <div class="detalhe-grid">
@@ -1048,22 +1048,22 @@ function verDetalhes(id) {
           </div>
           <div class="detalhe-item">
             <div class="detalhe-label">Nome do Estudo</div>
-            <div class="detalhe-value">${escapeHtml(solicitacao.nomeEstudo || "Nào informado")}</div>
+            <div class="detalhe-value">${escapeHtml(solicitacao.nomeEstudo || "Não informado")}</div>
           </div>
           <div class="detalhe-item">
-            <div class="detalhe-label">Data da Solicitaçào</div>
+            <div class="detalhe-label">Data da Solicitação</div>
             <div class="detalhe-value">${dataSolicitacao}</div>
           </div>
         </div>
       </div>
 
-      <!-- Seçào: Localizaçào e Empreendimento -->
+      <!-- Seção: Localização e Empreendimento -->
       <div class="detalhe-section">
-        <h4 class="detalhe-section-title"><i class="bi bi-geo-alt"></i> Localizaçào e Empreendimento</h4>
+        <h4 class="detalhe-section-title"><i class="bi bi-geo-alt"></i> Localização e Empreendimento</h4>
         <div class="detalhe-grid">
           <div class="detalhe-item">
             <div class="detalhe-label">Empreendimento</div>
-            <div class="detalhe-value">${escapeHtml(solicitacao.empreendimento || "Nào informado")}</div>
+            <div class="detalhe-value">${escapeHtml(solicitacao.empreendimento || "Não informado")}</div>
           </div>
           <div class="detalhe-item">
             <div class="detalhe-label">Localidade</div>
@@ -1071,12 +1071,12 @@ function verDetalhes(id) {
           </div>
           <div class="detalhe-item">
             <div class="detalhe-label">Município / Estado</div>
-            <div class="detalhe-value">${escapeHtml(solicitacao.municipio || "Nào informado")}</div>
+            <div class="detalhe-value">${escapeHtml(solicitacao.municipio || "Não informado")}</div>
           </div>
         </div>
       </div>
 
-      <!-- Seçào: Prazos -->
+      <!-- Seção: Prazos -->
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-calendar-check"></i> Prazos</h4>
         <div class="detalhe-grid">
@@ -1089,23 +1089,23 @@ function verDetalhes(id) {
             <div class="detalhe-value">${Number(solicitacao.prazoDias || 0)} dias úteis</div>
           </div>
           <div class="detalhe-item">
-            <div class="detalhe-label">Conclusào Prevista</div>
+            <div class="detalhe-label">Conclusão Prevista</div>
             <div class="detalhe-value">${dataConclusaoPrevista}</div>
           </div>
           <div class="detalhe-item">
-            <div class="detalhe-label">Conclusào Real</div>
+            <div class="detalhe-label">Conclusão Real</div>
             <div class="detalhe-value">${dataConclusaoReal}</div>
           </div>
           ${statusPrazo ? `
           <div class="detalhe-item">
-            <div class="detalhe-label">Situaçào do Prazo</div>
+            <div class="detalhe-label">Situação do Prazo</div>
             <div class="detalhe-value">${statusPrazo}</div>
           </div>
           ` : ""}
         </div>
       </div>
 
-      <!-- Seçào: Informações Técnicas -->
+      <!-- Seção: Informações Técnicas -->
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-tools"></i> Informações Técnicas</h4>
         <div class="detalhe-grid">
@@ -1119,7 +1119,7 @@ function verDetalhes(id) {
           </div>
           <div class="detalhe-item">
             <div class="detalhe-label">ART Necessária</div>
-            <div class="detalhe-value">${solicitacao.artNecessaria === "sim" ? "✓ Sim" : "✓ Nào"}</div>
+            <div class="detalhe-value">${solicitacao.artNecessaria === "sim" ? "✓ Sim" : "✓ Não"}</div>
           </div>
           ${solicitacao.artNecessaria === "sim" && solicitacao.artResponsavel ? `
           <div class="detalhe-item">
@@ -1138,23 +1138,23 @@ function verDetalhes(id) {
         </div>
       </div>
 
-      <!-- Seçào: Arquivos e Diretórios -->
+      <!-- Seção: Arquivos e Diretórios -->
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-folder"></i> Arquivos e Diretórios</h4>
         <div class="detalhe-grid">
           <div class="detalhe-item">
             <div class="detalhe-label">Diretório dos Arquivos</div>
-            <div class="detalhe-value">${escapeHtml(solicitacao.diretorioArquivos || "Nào especificado")}</div>
+            <div class="detalhe-value">${escapeHtml(solicitacao.diretorioArquivos || "Não especificado")}</div>
           </div>
           <div class="detalhe-item">
             <div class="detalhe-label">Diretório de Salvamento</div>
-            <div class="detalhe-value">${escapeHtml(solicitacao.diretorioSalvamento || "Nào especificado")}</div>
+            <div class="detalhe-value">${escapeHtml(solicitacao.diretorioSalvamento || "Não especificado")}</div>
           </div>
         </div>
       </div>
 
       ${solicitacao.observacoes ? `
-      <!-- Seçào: Observações -->
+      <!-- Seção: Observações -->
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-chat-left-text"></i> Observações</h4>
         <div class="detalhe-observacoes">
@@ -1248,7 +1248,7 @@ function finalizarSolicitacao(id) {
   }
 
   if (solicitacao.status === "finalizado") {
-    mostrarNotificacao("Esta Solicitaçào já foi finalizada.", "info");
+    mostrarNotificacao("Esta Solicitação já foi finalizada.", "info");
     return;
   }
 
@@ -1258,7 +1258,7 @@ function finalizarSolicitacao(id) {
   });
 
   fecharModal();
-  mostrarNotificacao(`Solicitaçào #${id} finalizada!`, "success");
+  mostrarNotificacao(`Solicitação #${id} finalizada!`, "success");
 }
 
 function abrirModalAtribuicao(id) {
@@ -1272,9 +1272,9 @@ function abrirModalAtribuicao(id) {
 
   conteudoAtribuicao.innerHTML = `
     <div class="form-group">
-      <p><strong>Solicitaçào #${id}</strong></p>
+      <p><strong>Solicitação #${id}</strong></p>
       <p>Estudo: ${escapeHtml(
-        solicitacao.nomeEstudo || "Nào informado"
+        solicitacao.nomeEstudo || "Não informado"
       )}</p>
       <p>Cliente: ${escapeHtml(solicitacao.cliente || "")}</p>
     </div>
@@ -1356,7 +1356,7 @@ function atribuirTecnico(id) {
 
   fecharModalAtribuicao();
   mostrarNotificacao(
-    `Solicitaçào #${id} atribuída para ${formatarNomeTecnico(tecnico)}!`,
+    `Solicitação #${id} atribuída para ${formatarNomeTecnico(tecnico)}!`,
     "success"
   );
 }
@@ -1371,14 +1371,14 @@ function confirmarExclusao(id) {
   if (!solicitacao || !conteudoConfirmacao) return;
 
   conteudoConfirmacao.innerHTML = `
-    <p><strong>Confirmar Exclusào</strong></p>
+    <p><strong>Confirmar Exclusão</strong></p>
     <p style="margin-top: 8px;">
-      Tem certeza que deseja excluir a Solicitaçào #${id} de ${escapeHtml(
+      Tem certeza que deseja excluir a Solicitação #${id} de ${escapeHtml(
         solicitacao.cliente || ""
       )}?
     </p>
     <p style="margin-top: 8px; color: var(--warning);">
-      Esta açào Nào pode ser desfeita!
+      Esta ação Não pode ser desfeita!
     </p>
     <div class="btn-group" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
@@ -1586,7 +1586,7 @@ function gerarRelatorio() {
             </div>
             <div class="relatorio-metric">
               <div class="relatorio-metric-value">${taxaConclusao}%</div>
-              <div class="relatorio-metric-label">Conclusào</div>
+              <div class="relatorio-metric-label">Conclusão</div>
             </div>
             <div class="relatorio-metric">
               <div class="relatorio-metric-value">${taxaPrazo}%</div>
@@ -1638,25 +1638,25 @@ function exportarRelatorioCompleto(dataInicio, dataFim) {
       ID: s.id,
       Solicitante: s.solicitante,
       Cliente: s.cliente,
-      Estudo: s.nomeEstudo || "Nào informado",
+      Estudo: s.nomeEstudo || "Não informado",
       "Tipo Mapa": formatarTipoMapa(s.tipoMapa, s.nomeTipoMapa),
       Município: s.municipio,
       Técnico: formatarNomeTecnico(s.tecnicoResponsavel),
       Status: formatarStatus(s.status),
       "Prazo (dias úteis)": s.prazoDias,
-      "Diretório Arquivos": s.diretorioArquivos || "Nào especificado",
+      "Diretório Arquivos": s.diretorioArquivos || "Não especificado",
       "Diretório Salvamento":
-        s.diretorioSalvamento || "Nào especificado",
-      "Data Solicitaçào": formatDateBR(s.dataSolicitacao),
-      "Conclusào Prevista": formatDateBR(s.dataConclusaoPrevista),
-      "Conclusào Real": s.dataConclusaoReal
+        s.diretorioSalvamento || "Não especificado",
+      "Data Solicitação": formatDateBR(s.dataSolicitacao),
+      "Conclusão Prevista": formatDateBR(s.dataConclusaoPrevista),
+      "Conclusão Real": s.dataConclusaoReal
         ? formatDateBR(s.dataConclusaoReal)
         : "",
       "Dentro do Prazo":
         s.status === "finalizado"
           ? dentroPrazo
             ? "SIM"
-            : "NàO"
+            : "NãO"
           : "EM ANDAMENTO",
     };
   });
@@ -1686,25 +1686,25 @@ function exportarTodosDados() {
       ID: s.id,
       Solicitante: s.solicitante,
       Cliente: s.cliente,
-      Estudo: s.nomeEstudo || "Nào informado",
+      Estudo: s.nomeEstudo || "Não informado",
       "Tipo Mapa": formatarTipoMapa(s.tipoMapa, s.nomeTipoMapa),
       Município: s.municipio,
       Técnico: formatarNomeTecnico(s.tecnicoResponsavel),
       Status: formatarStatus(s.status),
       "Prazo (dias úteis)": s.prazoDias,
-      "Diretório Arquivos": s.diretorioArquivos || "Nào especificado",
+      "Diretório Arquivos": s.diretorioArquivos || "Não especificado",
       "Diretório Salvamento":
-        s.diretorioSalvamento || "Nào especificado",
-      "Data Solicitaçào": formatDateBR(s.dataSolicitacao),
-      "Conclusào Prevista": formatDateBR(s.dataConclusaoPrevista),
-      "Conclusào Real": s.dataConclusaoReal
+        s.diretorioSalvamento || "Não especificado",
+      "Data Solicitação": formatDateBR(s.dataSolicitacao),
+      "Conclusão Prevista": formatDateBR(s.dataConclusaoPrevista),
+      "Conclusão Real": s.dataConclusaoReal
         ? formatDateBR(s.dataConclusaoReal)
         : "",
       "Dentro do Prazo":
         s.status === "finalizado"
           ? dentroPrazo
             ? "SIM"
-            : "NàO"
+            : "NãO"
           : "EM ANDAMENTO",
     };
   });
