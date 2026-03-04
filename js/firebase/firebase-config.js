@@ -33,5 +33,5 @@ window.dbRef = ref(db, "solicitacoes");
 // Funções de banco usadas pelo app principal
 window.firebaseFunctions = { ref, onValue, set, update, remove, runTransaction, get };
 
-console.log("✅ Firebase inicializado:", firebaseConfig.projectId);
+// Firebase inicializado
 

@@ -18,15 +18,13 @@ function restaurarLogin() {
       const dados = JSON.parse(loginSalvo);
       if (dados.tipo === 'gestor') {
         acessoGestor = true;
-        console.log("✅ Login de gestor restaurado");
       } else if (dados.tipo === 'tecnico' && dados.tecnico) {
         acessoTecnico = true;
         tecnicoLogado = dados.tecnico;
-        console.log("✅ Login de técnico restaurado:", tecnicoLogado);
       }
       atualizarIndicadorLogin();
     } catch (e) {
-      console.error("Erro ao restaurar login:", e);
+      console.error("Erro ao restaurar sessão:", e);
     }
   }
 }
@@ -361,19 +359,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Aguardar Firebase estar pronto
-  console.log("🔄 Aguardando Firebase...");
   const aguardarFirebase = setInterval(() => {
-    console.log("🔍 Verificando Firebase:", {
-      dbRef: !!window.dbRef,
-      firebaseFunctions: !!window.firebaseFunctions,
-      db: !!window.db
-    });
-    
     if (window.dbRef && window.firebaseFunctions) {
       clearInterval(aguardarFirebase);
-      console.log("✅ Firebase pronto! Carregando solicitações...");
       carregarSolicitacoesFirebase();
-      console.log("✅ App inicializado com Firebase");
     }
   }, 100);
 
@@ -381,10 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     clearInterval(aguardarFirebase);
     if (!window.dbRef) {
-      console.error("❌ Firebase não carregou após 5 segundos!");
-      console.error("window.dbRef:", window.dbRef);
-      console.error("window.firebaseFunctions:", window.firebaseFunctions);
-      console.error("window.db:", window.db);
+      console.error("Firebase: Falha ao inicializar");
     }
   }, 5000);
 });
@@ -419,7 +405,7 @@ function carregarSolicitacoesFirebase() {
   const dbRef = window.dbRef;
 
   if (!dbRef || !onValue) {
-    console.error("Firebase Nào inicializado!");
+    console.error("Firebase: Não inicializado");
     return;
   }
 
@@ -461,7 +447,7 @@ function salvarSolicitacaoFirebase(dados) {
         toggleForm();
       })
       .catch((err) => {
-        console.error("Erro ao salvar:", err);
+        console.error("Firebase: Erro ao salvar", err);
         mostrarNotificacao("Erro ao salvar Solicitaçào!", "error");
       });
   });
@@ -475,10 +461,10 @@ function atualizarSolicitacaoFirebase(id, dados) {
 
   update(solRef, dados)
     .then(() => {
-      console.log(`Solicitaçào #${id} atualizada`);
+      // Atualização bem-sucedida
     })
     .catch((err) => {
-      console.error("Erro ao atualizar:", err);
+      console.error("Firebase: Erro ao atualizar", err);
       mostrarNotificacao("Erro ao atualizar!", "error");
     });
 }
@@ -501,7 +487,7 @@ function excluirSolicitacao(id) {
       mostrarNotificacao(`Solicitaçào #${id} excluída!`, "success");
     })
     .catch((err) => {
-      console.error("Erro ao excluir:", err);
+      console.error("Firebase: Erro ao excluir", err);
       mostrarNotificacao("Erro ao excluir!", "error");
     });
 }
@@ -693,7 +679,7 @@ async function verificarCodigoFirebase(codigoDigitado) {
     }
     
   } catch (error) {
-    console.error("Erro ao verificar acesso:", error);
+    console.error("Auth: Erro ao verificar acesso", error);
     mostrarNotificacao("Erro ao verificar acesso. Tente novamente.", "error");
     return null;
   }
@@ -863,23 +849,15 @@ function atualizarTabela(filtroStatus = null) {
 //  DETALHES DA SOLICITAÇÃO
 // =======================================================
 function verDetalhes(id) {
-  console.log("🔍 Abrindo detalhes - ID:", id);
-  console.log("🔍 acessoGestor:", acessoGestor);
-  console.log("🔍 acessoTecnico:", acessoTecnico);
-  console.log("🔍 tecnicoLogado:", tecnicoLogado);
-  
   const solicitacao = solicitacoes.find((s) => s.id == id);
   
-  console.log("📦 Dados completos da solicitação:", solicitacao);
-  
   if (!solicitacao) {
-    console.error("❌ Solicitação não encontrada!");
     mostrarNotificacao("Solicitação não encontrada!", "error");
     return;
   }
   
   if (!conteudoDetalhes) {
-    console.error("❌ conteudoDetalhes não encontrado!");
+    console.error("Elemento conteudoDetalhes não encontrado");
     return;
   }
 
@@ -952,9 +930,7 @@ function verDetalhes(id) {
       </div>
 
       ${(() => {
-        console.log("🔍 Verificando acessoGestor no template:", acessoGestor);
         if (acessoGestor) {
-          console.log("✅ Renderizando seção Ações do Gestor");
           return `
       <!-- Seção: Ações do Gestor -->
       <div class="detalhe-section" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2);">
@@ -990,7 +966,6 @@ function verDetalhes(id) {
       </div>
           `;
         } else if (acessoTecnico && solicitacao.tecnicoResponsavel === tecnicoLogado) {
-          console.log("✅ Renderizando seção Ações do Técnico");
           return `
       <!-- Seção: Ações do Técnico -->
       <div class="detalhe-section" style="background: rgba(234, 179, 8, 0.05); border: 1px solid rgba(234, 179, 8, 0.2);">
@@ -1017,7 +992,6 @@ function verDetalhes(id) {
       </div>
           `;
         } else {
-          console.log("❌ Nenhuma seção de ações renderizada");
           return '';
         }
       })()}
@@ -1162,31 +1136,23 @@ function fecharModal() {
 }
 
 function mudarStatus(id, novoStatus) {
-  console.log("🔄 mudarStatus chamado - ID:", id, "Novo Status:", novoStatus);
-  console.log("📋 Array solicitacoes:", solicitacoes.map(s => ({ id: s.id, tipo: typeof s.id })));
-  
   if (!novoStatus) {
-    console.log("❌ Nenhum status selecionado");
     mostrarNotificacao("Selecione um estágio!", "warning");
     return;
   }
   
   if (!acessoGestor && !acessoTecnico) {
-    console.log("❌ Sem permissão - acessoGestor:", acessoGestor, "acessoTecnico:", acessoTecnico);
     mostrarNotificacao("Faça login para alterar status!", "warning");
     return;
   }
 
   const solicitacao = solicitacoes.find((s) => s.id == id);
-  console.log("📦 Solicitação encontrada:", solicitacao);
   
   if (!solicitacao) {
-    console.log("❌ Solicitação não encontrada");
     return;
   }
 
   if (acessoTecnico && solicitacao.tecnicoResponsavel !== tecnicoLogado) {
-    console.log("❌ Técnico não autorizado");
     mostrarNotificacao(
       "Você só pode alterar solicitações atribuídas a você!",
       "warning"
@@ -1194,7 +1160,6 @@ function mudarStatus(id, novoStatus) {
     return;
   }
 
-  console.log("✅ Atualizando status no Firebase...");
   atualizarSolicitacaoFirebase(id, { status: novoStatus });
 
   const mensagem = {
