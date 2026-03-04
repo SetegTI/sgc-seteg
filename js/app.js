@@ -717,12 +717,27 @@ async function validarCodigoAcesso() {
   salvarLogin('gestor');
   mostrarNotificacao("Acesso de gestor concedido!", "success");
   fecharModalAcessoGestor();
-  atualizarListaTecnicos();
   atualizarIndicadorLogin();
+  atualizarListaTecnicos();
+  
+  // Mostrar painel do gestor
+  const painelGestor = document.getElementById("painelGestor");
+  if (painelGestor) painelGestor.style.display = "block";
+  
+  // Esconder painel do técnico
+  const painelTecnico = document.getElementById("painelTecnico");
+  if (painelTecnico) painelTecnico.style.display = "none";
 }
 
 async function validarAcessoTecnico() {
   const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
+  const tecnicoSelecionado = document.getElementById("selectTecnicoAcesso")?.value;
+  
+  if (!tecnicoSelecionado) {
+    mostrarNotificacao("Selecione seu nome primeiro!", "warning");
+    return;
+  }
+  
   const usuario = await verificarCodigoFirebase(codigo);
   
   if (!usuario) {
@@ -734,16 +749,30 @@ async function validarAcessoTecnico() {
     return;
   }
   
+  // Verificar se o código corresponde ao técnico selecionado
+  if (usuario.codigoTecnico !== tecnicoSelecionado) {
+    mostrarNotificacao(`Este código não pertence a ${formatarNomeTecnico(tecnicoSelecionado)}!`, "error");
+    return;
+  }
+  
   // Login como técnico
   acessoTecnico = true;
   tecnicoLogado = usuario.codigoTecnico || usuario.nome;
   salvarLogin('tecnico', tecnicoLogado);
   mostrarNotificacao(`Bem-vindo(a), ${usuario.nome || formatarNomeTecnico(tecnicoLogado)}!`, "success");
   fecharModalAcessoTecnico();
+  atualizarIndicadorLogin();
   atualizarTabela();
   atualizarEstatisticas();
   atualizarEstatisticasTecnico();
-  atualizarIndicadorLogin();
+  
+  // Mostrar painel do técnico
+  const painelTecnico = document.getElementById("painelTecnico");
+  if (painelTecnico) painelTecnico.style.display = "block";
+  
+  // Esconder painel do gestor
+  const painelGestor = document.getElementById("painelGestor");
+  if (painelGestor) painelGestor.style.display = "none";
 }
 
 function abrirModalAcessoTecnico() {
@@ -1449,7 +1478,8 @@ function gerarRelatorio() {
 
   const foraPrazo = finalizadas - dentroPrazo;
 
-  const tecnicos = Object.keys(CODIGOS_TECNICOS);
+  // Lista de técnicos conhecidos
+  const tecnicos = ["LAIS", "LAIZE", "VALESKA", "LIZABETH", "ISMAEL", "FERNANDO"];
   const estatisticasTecnicos = {};
 
   tecnicos.forEach((tecnico) => {
@@ -1693,7 +1723,8 @@ function atualizarListaTecnicos() {
     return;
   }
 
-  const tecnicos = Object.keys(CODIGOS_TECNICOS);
+  // Lista de técnicos conhecidos
+  const tecnicos = ["LAIS", "LAIZE", "VALESKA", "LIZABETH", "ISMAEL", "FERNANDO"];
   let html = "";
 
   tecnicos.forEach((tecnico) => {
