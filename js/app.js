@@ -28,15 +28,25 @@ function restaurarLogin() {
 
 // Mostrar painéis após restaurar login
 function mostrarPaineisLogin() {
+  console.log("mostrarPaineisLogin chamado - acessoGestor:", acessoGestor, "acessoTecnico:", acessoTecnico);
+  
   if (acessoGestor) {
     const painelGestor = document.getElementById("painelGestor");
-    if (painelGestor) painelGestor.style.display = "block";
+    console.log("Painel Gestor encontrado:", !!painelGestor);
+    if (painelGestor) {
+      painelGestor.style.display = "block";
+      console.log("Painel Gestor exibido");
+    }
     
     const painelTecnico = document.getElementById("painelTecnico");
     if (painelTecnico) painelTecnico.style.display = "none";
   } else if (acessoTecnico && tecnicoLogado) {
     const painelTecnico = document.getElementById("painelTecnico");
-    if (painelTecnico) painelTecnico.style.display = "block";
+    console.log("Painel Técnico encontrado:", !!painelTecnico);
+    if (painelTecnico) {
+      painelTecnico.style.display = "block";
+      console.log("Painel Técnico exibido");
+    }
     
     const painelGestor = document.getElementById("painelGestor");
     if (painelGestor) painelGestor.style.display = "none";
