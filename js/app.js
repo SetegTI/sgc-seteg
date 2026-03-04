@@ -506,8 +506,10 @@ function toggleForm() {
   if (btnToggle) {
     if (isActive) {
       btnToggle.innerHTML = '<i class="bi bi-chevron-up"></i> Recolher Formulário';
+      formSection?.setAttribute("aria-hidden", "false");
     } else {
       btnToggle.innerHTML = '<i class="bi bi-file-earmark-plus"></i> Nova Solicitação';
+      formSection?.setAttribute("aria-hidden", "true");
     }
   }
 }
