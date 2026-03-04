@@ -1378,7 +1378,7 @@ function confirmarExclusao(id) {
       )}?
     </p>
     <p style="margin-top: 8px; color: var(--warning);">
-      Esta ação Não pode ser desfeita!
+      Esta ação NÃO pode ser desfeita!
     </p>
     <div class="btn-group" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
