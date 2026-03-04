@@ -1,29 +1,55 @@
-# 🗺️ SGC Seteg
-Sistema de Gestão Cartográfica da Seteg.
+# SGC SETEG - Sistema de Gestão Cartográfica
 
----
+Sistema de gerenciamento de solicitações cartográficas desenvolvido para o Setor Geoambiental.
 
-## 📌 Sobre o Projeto
+## 📁 Estrutura do Projeto
 
-O **SGC Seteg** é um sistema web desenvolvido para gerenciamento, visualização e organização de dados cartográficos.
+```
+sgc-seteg/
+├── index.html              # Página principal
+├── css/
+│   └── style.css          # Estilos da aplicação
+├── js/
+│   ├── app.js             # Lógica principal
+│   ├── firebase/
+│   │   └── firebase-config.js
+│   ├── modules/
+│   │   ├── auth-module.js
+│   │   ├── cartography-data-module.js
+│   │   └── map-module.js
+│   └── utils/
+│       └── dom-utils.js
+└── assets/
+    ├── images/            # Imagens (logos, backgrounds)
+    └── icons/             # Ícones
+```
 
-O objetivo do projeto é fornecer uma plataforma moderna e eficiente para manipulação de informações geoespaciais, integrando interface web e serviços em nuvem.
+## 🚀 Como Usar
 
----
+### Localmente
 
-## 🚀 Status do Projeto
+1. Execute o arquivo `iniciar-servidor-e-abrir.bat`
+2. O navegador abrirá automaticamente em `http://localhost:8080`
 
-🔧 Em desenvolvimento
+### GitHub Pages
 
----
+1. Faça push do projeto para o GitHub
+2. Vá em Settings > Pages
+3. Selecione a branch `main` como source
+4. O site estará disponível em `https://seu-usuario.github.io/sgc-seteg`
 
-## 🛠 Tecnologias Utilizadas
+## 🔧 Tecnologias
 
 - HTML5
-- CSS3
-- JavaScript
-- Firebase
+- CSS3 (Design System customizado)
+- JavaScript (ES6+)
+- Firebase Realtime Database
+- Bootstrap Icons
+
+## 📝 Versão
+
+R02 - Fevereiro/2026
 
 ---
 
-## 📂 Estrutura Atual
+Desenvolvido pelo Setor Geoambiental
