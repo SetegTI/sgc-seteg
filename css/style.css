@@ -62,7 +62,7 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  padding: 16px 16px 64px;
+  padding: 16px 16px 48px;
 }
 
 [data-theme="light"] body {
@@ -285,9 +285,9 @@ body {
   position: sticky;
   top: 16px;
   align-self: flex-start;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - 80px);
   overflow-y: auto;
-  padding-bottom: 80px;
+  padding-bottom: 20px;
 }
 
 /* Scrollbar da sidebar */
