@@ -361,9 +361,17 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Aguardar Firebase estar pronto
+  console.log("🔄 Aguardando Firebase...");
   const aguardarFirebase = setInterval(() => {
+    console.log("🔍 Verificando Firebase:", {
+      dbRef: !!window.dbRef,
+      firebaseFunctions: !!window.firebaseFunctions,
+      db: !!window.db
+    });
+    
     if (window.dbRef && window.firebaseFunctions) {
       clearInterval(aguardarFirebase);
+      console.log("✅ Firebase pronto! Carregando solicitações...");
       carregarSolicitacoesFirebase();
       console.log("✅ App inicializado com Firebase");
     }
@@ -373,7 +381,10 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     clearInterval(aguardarFirebase);
     if (!window.dbRef) {
-      console.error("❌ Firebase nào carregou!");
+      console.error("❌ Firebase não carregou após 5 segundos!");
+      console.error("window.dbRef:", window.dbRef);
+      console.error("window.firebaseFunctions:", window.firebaseFunctions);
+      console.error("window.db:", window.db);
     }
   }, 5000);
 });
