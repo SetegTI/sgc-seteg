@@ -331,6 +331,12 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEnterNoModal(modalAcessoGestor, validarCodigoAcesso);
   bindEnterNoModal(modalAcessoTecnico, validarAcessoTecnico);
   
+  // Aplicar máscaras de data
+  aplicarMascaraData(document.getElementById("dataSolicitacao"));
+  aplicarMascaraData(document.getElementById("dataEntrega"));
+  aplicarMascaraData(document.getElementById("relatorioPeriodoInicio"));
+  aplicarMascaraData(document.getElementById("relatorioPeriodoFim"));
+  
   // Fechar modais com ESC
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -578,8 +584,8 @@ function salvarSolicitacao(e) {
     diretorioArquivos: formData.get("diretorioArquivos"),
     diretorioSalvamento: formData.get("diretorioSalvamento"),
     observacoes: formData.get("observacoes") || "",
-    dataSolicitacao: formData.get("dataSolicitacao"),
-    dataEntrega: formData.get("dataEntrega") || "",
+    dataSolicitacao: converterDataParaISO(formData.get("dataSolicitacao")),
+    dataEntrega: converterDataParaISO(formData.get("dataEntrega")) || "",
     prazoDias: Number(formData.get("prazoDias")) || 0,
     status: "fila",
     tecnicoResponsavel: "PENDENTE",
@@ -1261,8 +1267,8 @@ function abrirModalAtribuicao(id) {
     </div>
 
     <div class="form-group" style="margin-top: 12px;">
-      <label for="inputDataConclusao">Data de Conclusào (Prazo)</label>
-      <input type="date" id="inputDataConclusao" />
+      <label for="inputDataConclusao">Data de Conclusão (Prazo)</label>
+      <input type="text" id="inputDataConclusao" placeholder="DD/MM/AAAA" maxlength="10" />
     </div>
 
     <div class="btn-group" style="margin-top: 16px;">
@@ -1278,6 +1284,11 @@ function abrirModalAtribuicao(id) {
     sel.value = solicitacao.tecnicoResponsavel;
 
   modalAtribuicao?.classList.add("active");
+  
+  // Aplicar máscara no campo de data após o modal ser aberto
+  setTimeout(() => {
+    aplicarMascaraData(document.getElementById("inputDataConclusao"));
+  }, 100);
 }
 
 function fecharModalAtribuicao() {
@@ -1286,13 +1297,15 @@ function fecharModalAtribuicao() {
 
 function atribuirTecnico(id) {
   const tecnico = document.getElementById("selectTecnico")?.value;
-  const dataConclusao =
-    document.getElementById("inputDataConclusao")?.value;
+  const dataConclusaoBR = document.getElementById("inputDataConclusao")?.value;
 
   if (!tecnico || tecnico === "PENDENTE") {
     mostrarNotificacao("Selecione um Técnico!", "warning");
     return;
   }
+  
+  // Converter data BR para ISO se fornecida
+  const dataConclusao = dataConclusaoBR ? converterDataParaISO(dataConclusaoBR) : null;
 
   atualizarSolicitacaoFirebase(id, {
     tecnicoResponsavel: tecnico,
@@ -1408,15 +1421,18 @@ function gerarRelatorio() {
     return;
   }
 
-  const dataInicio = document.getElementById(
-    "relatorioPeriodoInicio"
-  )?.value;
-  const dataFim = document.getElementById("relatorioPeriodoFim")?.value;
+  const dataInicioBR = document.getElementById("relatorioPeriodoInicio")?.value;
+  const dataFimBR = document.getElementById("relatorioPeriodoFim")?.value;
 
-  if (!dataInicio || !dataFim) {
+  if (!dataInicioBR || !dataFimBR) {
     mostrarNotificacao("Selecione o período!", "warning");
     return;
   }
+  
+  // Converter datas BR para ISO
+  const dataInicio = converterDataParaISO(dataInicioBR);
+  const dataFim = converterDataParaISO(dataFimBR);
+  
   if (parseDateOnly(dataInicio) > parseDateOnly(dataFim)) {
     mostrarNotificacao("Data inicial maior que final!", "error");
     return;
@@ -1886,4 +1902,63 @@ function togglePasswordVisibility(inputId, iconId) {
     input.type = "password";
     icon.className = "bi bi-eye";
   }
+}
+
+
+// Máscara para campos de data DD/MM/AAAA
+function aplicarMascaraData(input) {
+  if (!input) return;
+  
+  input.addEventListener('input', function(e) {
+    let valor = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
+    
+    // Limita a 8 dígitos (DDMMAAAA)
+    if (valor.length > 8) {
+      valor = valor.substring(0, 8);
+    }
+    
+    // Aplica a máscara DD/MM/AAAA
+    if (valor.length >= 5) {
+      valor = valor.substring(0, 2) + '/' + valor.substring(2, 4) + '/' + valor.substring(4, 8);
+    } else if (valor.length >= 3) {
+      valor = valor.substring(0, 2) + '/' + valor.substring(2, 4);
+    }
+    
+    e.target.value = valor;
+  });
+  
+  // Validação ao sair do campo
+  input.addEventListener('blur', function(e) {
+    const valor = e.target.value;
+    if (valor && valor.length === 10) {
+      const partes = valor.split('/');
+      if (partes.length === 3) {
+        const dia = parseInt(partes[0]);
+        const mes = parseInt(partes[1]);
+        const ano = parseInt(partes[2]);
+        
+        // Validação básica
+        if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2100) {
+          mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
+          e.target.value = '';
+        }
+      }
+    }
+  });
+}
+
+// Converter data DD/MM/AAAA para AAAA-MM-DD (formato do Firebase)
+function converterDataParaISO(dataBR) {
+  if (!dataBR || dataBR.length !== 10) return '';
+  const partes = dataBR.split('/');
+  if (partes.length !== 3) return '';
+  return `${partes[2]}-${partes[1]}-${partes[0]}`;
+}
+
+// Converter data AAAA-MM-DD para DD/MM/AAAA
+function converterDataParaBR(dataISO) {
+  if (!dataISO) return '';
+  const partes = dataISO.split('-');
+  if (partes.length !== 3) return '';
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
