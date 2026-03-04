@@ -43,17 +43,6 @@ function limparLogin() {
   localStorage.removeItem('sgc_login');
 }
 
-// Códigos de acesso
-const CODIGO_GESTOR = "482913";
-const CODIGOS_TECNICOS = {
-  LAIS: "739156",
-  LAIZE: "885412",
-  VALESKA: "605284",
-  LIZABETH: "918347",
-  ISMAEL: "274690",
-  FERNANDO: "563821",
-};
-
 // Referências DOM
 let formSolicitacao,
   tabelaSolicitacoes,
@@ -662,20 +651,83 @@ function fecharModalAcessoGestor() {
   if (input) input.value = "";
 }
 
-function validarCodigoAcesso() {
-  const codigo = document.getElementById("codigoAcesso")?.value.trim();
-  if (codigo === CODIGO_GESTOR) {
-    acessoGestor = true;
-    fecharModalAcessoGestor();
-    salvarLogin('gestor');
-    mostrarNotificacao("Acesso de gestor concedido!", "success");
-    atualizarListaTecnicos();
-    atualizarIndicadorLogin();
-  } else {
-    mostrarNotificacao("Código incorreto!", "error");
+// =======================================================
+//  AUTENTICAÇÃO COM FIREBASE
+// =======================================================
+async function verificarCodigoFirebase(codigoDigitado, tipo) {
+  if (!codigoDigitado) {
+    mostrarNotificacao("Digite um código!", "warning");
+    return false;
+  }
+
+  try {
+    const { ref, get } = window.firebaseFunctions;
+    const db = window.db;
+    
+    const snapshot = await get(ref(db, "acessos/" + codigoDigitado));
+    
+    if (!snapshot.exists()) {
+      mostrarNotificacao("Código inválido!", "error");
+      return false;
+    }
+    
+    const dados = snapshot.val();
+    
+    // Verificar se o tipo corresponde
+    if (tipo === 'gestor' && dados.role !== 'gestor') {
+      mostrarNotificacao("Este código não é de gestor!", "error");
+      return false;
+    }
+    
+    if (tipo === 'tecnico' && dados.role !== 'tecnico') {
+      mostrarNotificacao("Este código não é de técnico!", "error");
+      return false;
+    }
+    
+    // Salvar na sessão
+    if (dados.role === 'gestor') {
+      acessoGestor = true;
+      salvarLogin('gestor');
+      mostrarNotificacao("Acesso de gestor concedido!", "success");
+      atualizarListaTecnicos();
+      atualizarIndicadorLogin();
+    }
+    
+    if (dados.role === 'tecnico') {
+      acessoTecnico = true;
+      tecnicoLogado = dados.codigo || dados.nome;
+      salvarLogin('tecnico', tecnicoLogado);
+      mostrarNotificacao(`Bem-vindo(a), ${dados.nome || formatarNomeTecnico(tecnicoLogado)}!`, "success");
+      atualizarTabela();
+      atualizarEstatisticas();
+      atualizarEstatisticasTecnico();
+      atualizarIndicadorLogin();
+    }
+    
+    return true;
+    
+  } catch (error) {
+    console.error("Erro ao verificar código:", error);
+    mostrarNotificacao("Erro ao verificar acesso. Tente novamente.", "error");
+    return false;
   }
 }
 
+async function validarCodigoAcesso() {
+  const codigo = document.getElementById("codigoAcesso")?.value.trim();
+  const sucesso = await verificarCodigoFirebase(codigo, 'gestor');
+  if (sucesso) {
+    fecharModalAcessoGestor();
+  }
+}
+
+async function validarAcessoTecnico() {
+  const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
+  const sucesso = await verificarCodigoFirebase(codigo, 'tecnico');
+  if (sucesso) {
+    fecharModalAcessoTecnico();
+  }
+}
 
 function abrirModalAcessoTecnico() {
   // Bloquear se já estiver logado como gestor
@@ -691,31 +743,6 @@ function fecharModalAcessoTecnico() {
   modalAcessoTecnico?.classList.remove("active");
   const input = document.getElementById("codigoAcessoTecnico");
   if (input) input.value = "";
-}
-
-function validarAcessoTecnico() {
-  const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
-  
-  const tecnico = Object.keys(CODIGOS_TECNICOS).find(
-    (t) => CODIGOS_TECNICOS[t] === codigo
-  );
-
-  if (tecnico) {
-    acessoTecnico = true;
-    tecnicoLogado = tecnico;
-    fecharModalAcessoTecnico();
-    salvarLogin('tecnico', tecnico);
-    mostrarNotificacao(
-      `Bem-vindo(a), ${formatarNomeTecnico(tecnico)}!`,
-      "success"
-    );
-    atualizarTabela();
-    atualizarEstatisticas();
-    atualizarEstatisticasTecnico();
-    atualizarIndicadorLogin();
-  } else {
-    mostrarNotificacao("Código incorreto!", "error");
-  }
 }
 
 

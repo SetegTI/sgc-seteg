@@ -7,6 +7,7 @@ import {
   update,
   remove,
   runTransaction,
+  get,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
 const firebaseConfig = {
@@ -30,7 +31,7 @@ window.db = db;
 window.dbRef = ref(db, "solicitacoes");
 
 // Funções de banco usadas pelo app principal
-window.firebaseFunctions = { ref, onValue, set, update, remove, runTransaction };
+window.firebaseFunctions = { ref, onValue, set, update, remove, runTransaction, get };
 
 console.log("✅ Firebase inicializado:", firebaseConfig.projectId);
 
