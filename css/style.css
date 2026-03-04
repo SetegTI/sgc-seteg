@@ -39,12 +39,6 @@
   --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.08);
 }
 
-[data-theme="light"] body {
-  background-image:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.98)),
-    url("/public/doc/plano_fundo.png");
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -63,7 +57,7 @@ body {
   color: var(--text);
   background-image:
     linear-gradient(180deg, rgba(5, 8, 22, 0.5), rgba(5, 8, 22, 0.7)),
-    url("/src/assets/images/bg-azul.png");
+    url("../assets/images/bg-azul.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -74,7 +68,7 @@ body {
 [data-theme="light"] body {
   background-image:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(248, 250, 252, 0.2)),
-    url("/src/assets/images/bg-branco.png");
+    url("../assets/images/bg-branco.png");
 }
 
 .container {
@@ -155,11 +149,11 @@ body {
   object-fit: contain;
   display: block;
   transition: transform 0.3s ease;
-  content: url("/src/assets/images/logo-branco.png");
+  content: url("../assets/images/logo-branco.png");
 }
 
 [data-theme="light"] .brand-logo {
-  content: url("/src/assets/images/logo-preto.png");
+  content: url("../assets/images/logo-preto.png");
 }
 
 .brand-logo:hover {

@@ -14,6 +14,6 @@ echo Pressione Ctrl+C para parar o servidor
 echo ========================================
 echo.
 cd /d "%~dp0"
-start http://localhost:8080/public/index.html
-live-server --port=8080 --entry-file=public/index.html --no-browser
+start http://localhost:8080/index.html
+live-server --port=8080 --entry-file=index.html --no-browser
 pause
