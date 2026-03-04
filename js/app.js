@@ -1,7 +1,5 @@
-﻿// =======================================================
-//  SGC SETEG - Sistema de Gestào Cartográfica
-//  app.js - Lógica principal da aplicaçào
-// =======================================================
+﻿// SGC SETEG - Sistema de Gestão Cartográfica
+// app.js - Lógica principal da aplicação
 
 // Variáveis globais
 let solicitacoes = [];
@@ -58,9 +56,7 @@ let formSolicitacao,
   estatisticasTecnico,
   tabBtns;
 
-// =======================================================
-//  FUNÇÕES AUXILIARES
-// =======================================================
+// Funções Auxiliares
 function escapeHtml(str) {
   if (!str) return "";
   const div = document.createElement("div");
@@ -256,9 +252,7 @@ function calcularDataConclusao(dataInicio, prazoDias) {
   return data.toISOString().split("T")[0];
 }
 
-// =======================================================
-//  INICIALIZAÇÃO
-// =======================================================
+// Inicialização
 document.addEventListener("DOMContentLoaded", () => {
   // Carregar tema salvo
   currentTheme = localStorage.getItem('theme') || 'dark';
@@ -375,9 +369,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 5000);
 });
 
-// =======================================================
-//  THEME TOGGLE (Dark/Light Mode)
-// =======================================================
+// Theme Toggle
 function toggleTheme() {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   applyTheme(currentTheme);
@@ -397,9 +389,7 @@ function applyTheme(theme) {
   }
 }
 
-// =======================================================
-//  FIREBASE - CRUD
-// =======================================================
+// Firebase - CRUD
 function carregarSolicitacoesFirebase() {
   const { onValue } = window.firebaseFunctions;
   const dbRef = window.dbRef;
@@ -492,9 +482,7 @@ function excluirSolicitacao(id) {
     });
 }
 
-// =======================================================
-//  FORMULÁRIO
-// =======================================================
+// Formulário
 function toggleForm() {
   const formSection = document.querySelector(".form-section");
   const btnToggle = document.getElementById("btnToggleForm");
@@ -606,9 +594,7 @@ function salvarSolicitacao(e) {
   salvarSolicitacaoFirebase(dados);
 }
 
-// =======================================================
-//  ACESSO GESTOR / TÉCNICO
-// =======================================================
+// Acesso Gestor / Técnico
 function atualizarIndicadorLogin() {
   const indicator = document.getElementById("loginIndicator");
   const loginText = document.getElementById("loginText");
@@ -648,9 +634,7 @@ function fecharModalAcessoGestor() {
   if (input) input.value = "";
 }
 
-// =======================================================
-//  AUTENTICAÇÃO COM FIREBASE
-// =======================================================
+// Autenticação com Firebase
 async function verificarCodigoFirebase(codigoDigitado) {
   if (!codigoDigitado) {
     mostrarNotificacao("Digite um código!", "warning");
@@ -791,9 +775,7 @@ function fazerLogout() {
   atualizarIndicadorLogin();
 }
 
-// =======================================================
-//  TABELA
-// =======================================================
+// Tabela
 function atualizarTabela(filtroStatus = null) {
   if (!tabelaSolicitacoes) return;
 
@@ -845,9 +827,7 @@ function atualizarTabela(filtroStatus = null) {
   tabelaSolicitacoes.innerHTML = html;
 }
 
-// =======================================================
-//  DETALHES DA SOLICITAÇÃO
-// =======================================================
+// Detalhes da Solicitação
 function verDetalhes(id) {
   const solicitacao = solicitacoes.find((s) => s.id == id);
   
