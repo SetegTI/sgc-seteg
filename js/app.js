@@ -654,78 +654,86 @@ function fecharModalAcessoGestor() {
 // =======================================================
 //  AUTENTICAÇÃO COM FIREBASE
 // =======================================================
-async function verificarCodigoFirebase(codigoDigitado, tipo) {
+async function verificarCodigoFirebase(codigoDigitado) {
   if (!codigoDigitado) {
     mostrarNotificacao("Digite um código!", "warning");
-    return false;
+    return null;
   }
 
   try {
-    const { ref, get } = window.firebaseFunctions;
-    const db = window.db;
+    const caminho = `acessos/${codigoDigitado}`;
     
-    const snapshot = await get(ref(db, "acessos/" + codigoDigitado));
+    const snapshot = await window.firebaseFunctions.get(
+      window.firebaseFunctions.ref(window.db, caminho)
+    );
     
-    if (!snapshot.exists()) {
+    if (snapshot.exists()) {
+      const dados = snapshot.val();
+      
+      return {
+        codigo: codigoDigitado,
+        role: dados.role || "tecnico",
+        nome: dados.nome || "",
+        codigoTecnico: dados.codigo || ""
+      };
+    } else {
       mostrarNotificacao("Código inválido!", "error");
-      return false;
+      return null;
     }
-    
-    const dados = snapshot.val();
-    
-    // Verificar se o tipo corresponde
-    if (tipo === 'gestor' && dados.role !== 'gestor') {
-      mostrarNotificacao("Este código não é de gestor!", "error");
-      return false;
-    }
-    
-    if (tipo === 'tecnico' && dados.role !== 'tecnico') {
-      mostrarNotificacao("Este código não é de técnico!", "error");
-      return false;
-    }
-    
-    // Salvar na sessão
-    if (dados.role === 'gestor') {
-      acessoGestor = true;
-      salvarLogin('gestor');
-      mostrarNotificacao("Acesso de gestor concedido!", "success");
-      atualizarListaTecnicos();
-      atualizarIndicadorLogin();
-    }
-    
-    if (dados.role === 'tecnico') {
-      acessoTecnico = true;
-      tecnicoLogado = dados.codigo || dados.nome;
-      salvarLogin('tecnico', tecnicoLogado);
-      mostrarNotificacao(`Bem-vindo(a), ${dados.nome || formatarNomeTecnico(tecnicoLogado)}!`, "success");
-      atualizarTabela();
-      atualizarEstatisticas();
-      atualizarEstatisticasTecnico();
-      atualizarIndicadorLogin();
-    }
-    
-    return true;
     
   } catch (error) {
-    console.error("Erro ao verificar código:", error);
+    console.error("Erro ao verificar acesso:", error);
     mostrarNotificacao("Erro ao verificar acesso. Tente novamente.", "error");
-    return false;
+    return null;
   }
 }
 
 async function validarCodigoAcesso() {
   const codigo = document.getElementById("codigoAcesso")?.value.trim();
-  const sucesso = await verificarCodigoFirebase(codigo, 'gestor');
-  if (sucesso) {
-    fecharModalAcessoGestor();
+  const usuario = await verificarCodigoFirebase(codigo);
+  
+  if (!usuario) {
+    return;
   }
+  
+  if (usuario.role !== 'gestor') {
+    mostrarNotificacao("Este código não é de gestor!", "error");
+    return;
+  }
+  
+  // Login como gestor
+  acessoGestor = true;
+  salvarLogin('gestor');
+  mostrarNotificacao("Acesso de gestor concedido!", "success");
+  fecharModalAcessoGestor();
+  atualizarListaTecnicos();
+  atualizarIndicadorLogin();
 }
 
 async function validarAcessoTecnico() {
   const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
-  const sucesso = await verificarCodigoFirebase(codigo, 'tecnico');
-  if (sucesso) {
-    fecharModalAcessoTecnico();
+  const usuario = await verificarCodigoFirebase(codigo);
+  
+  if (!usuario) {
+    return;
+  }
+  
+  if (usuario.role !== 'tecnico') {
+    mostrarNotificacao("Este código não é de técnico!", "error");
+    return;
+  }
+  
+  // Login como técnico
+  acessoTecnico = true;
+  tecnicoLogado = usuario.codigoTecnico || usuario.nome;
+  salvarLogin('tecnico', tecnicoLogado);
+  mostrarNotificacao(`Bem-vindo(a), ${usuario.nome || formatarNomeTecnico(tecnicoLogado)}!`, "success");
+  fecharModalAcessoTecnico();
+  atualizarTabela();
+  atualizarEstatisticas();
+  atualizarEstatisticasTecnico();
+  atualizarIndicadorLogin();
+}
   }
 }
 
