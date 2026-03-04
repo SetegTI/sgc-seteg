@@ -734,8 +734,6 @@ async function validarAcessoTecnico() {
   atualizarEstatisticasTecnico();
   atualizarIndicadorLogin();
 }
-  }
-}
 
 function abrirModalAcessoTecnico() {
   // Bloquear se já estiver logado como gestor
