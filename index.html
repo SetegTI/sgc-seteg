@@ -16,6 +16,9 @@
 
   <!-- Firebase (module) – carregado antes do app -->
   <script type="module" src="js/firebase/firebase-config.js"></script>
+  
+  <!-- Módulo de Versionamento -->
+  <script type="module" src="js/modules/versioning-module.js"></script>
 </head>
 
 <body>
@@ -27,7 +30,6 @@
             <img id="logoSeteg" class="brand-logo" alt="Logo SETEG" />
             <div class="brand-text">
               <h1>Sistema de Solicitação Cartográfica</h1>
-              <p class="subtitle">Fluxo rápido, acompanhe suas solicitações em tempo real</p>
             </div>
           </div>
         </div>
@@ -38,6 +40,14 @@
             <div class="theme-toggle-slider">
               <i class="bi bi-moon-fill"></i>
             </div>
+          </div>
+          
+          <!-- Notificações de Ajustes Pendentes (apenas para gestor) -->
+          <div id="notificacoesAjustes" style="display: none; position: relative; overflow: visible;">
+            <button class="btn btn-ghost" type="button" onclick="abrirModalAjustesPendentes()" title="Ajustes pendentes de aprovação" style="position: relative; overflow: visible;">
+              <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
+              <span id="badgeAjustesPendentes" class="notification-badge" style="display: none;">0</span>
+            </button>
           </div>
           
           <!-- Indicador de Login -->
@@ -138,6 +148,8 @@
                 </div>
               </div>
 
+              <div class="section-title"><i class="bi bi-map"></i> Dados Técnicos do Mapa</div>
+
               <div class="row">
                 <div class="form-group">
                   <label for="diretorioArquivos">Diretório dos Arquivos de Referência *</label>
@@ -177,8 +189,6 @@
                   <input type="text" id="tipoMapaOutrosTexto" name="tipoMapaOutrosTexto" placeholder="Digite o nome do mapa" />
                 </div>
               </div>
-
-              <div class="section-title"><i class="bi bi-map"></i> Dados Técnicos do Mapa</div>
 
               <div class="row">
                 <div class="form-group">
@@ -556,12 +566,155 @@
     </div>
   </div>
 
+  <!-- Modal Solicitar Ajuste -->
+  <div id="modalAjuste" class="modal" role="dialog" aria-modal="true" aria-label="Solicitar ajuste">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="bi bi-pencil-square"></i> Solicitar Ajuste</h3>
+        <button class="close-modal" type="button" onclick="fecharModalAjuste()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Criar nova versão com ajustes:</strong></p>
+        <input type="hidden" id="ajusteIdSolicitacao" />
+        
+        <div class="form-group" style="margin-top: 16px;">
+          <label for="ajusteNomeSolicitante">Seu Nome *</label>
+          <input type="text" id="ajusteNomeSolicitante" placeholder="Digite seu nome completo" required />
+          <small class="help">Obrigatório - Identifique-se para que o gestor saiba quem solicitou</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="ajusteDiretorioReferencia">Diretório de Referência *</label>
+          <input type="text" id="ajusteDiretorioReferencia" placeholder="Ex: C:/Projetos/Estudo01" required />
+          <small class="help">Obrigatório</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="ajusteDiretorioSalvamento">Diretório de Salvamento *</label>
+          <input type="text" id="ajusteDiretorioSalvamento" placeholder="Ex: C:/Saidas/Estudo01" required />
+          <small class="help">Obrigatório</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="ajusteTipoAjuste">Tipo de Ajuste *</label>
+          <select id="ajusteTipoAjuste" required>
+            <option value="">Selecione...</option>
+            <option value="CORRECAO">Correção</option>
+            <option value="ADICAO">Adição de Elementos</option>
+            <option value="REMOCAO">Remoção de Elementos</option>
+            <option value="ATUALIZACAO">Atualização de Dados</option>
+            <option value="OUTROS">Outros</option>
+          </select>
+          <small class="help">Obrigatório</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="ajusteObservacoes">Observações do Ajuste *</label>
+          <textarea id="ajusteObservacoes" rows="4" placeholder="Descreva as alterações necessárias..." required></textarea>
+          <small class="help">Obrigatório - Seja específico sobre o que precisa ser ajustado</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="ajustePrazoFinal">Novo Prazo Final *</label>
+          <div class="date-input-wrapper">
+            <input type="text" id="ajustePrazoFinal" placeholder="DD/MM/AAAA" maxlength="10" required />
+            <span class="calendar-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16">
+                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+              </svg>
+            </span>
+          </div>
+          <small class="help">Obrigatório</small>
+        </div>
+        
+        <div class="btn-group" style="margin-top: 16px;">
+          <button class="btn btn-primary" type="button" onclick="confirmarSolicitarAjuste()">
+            <i class="bi bi-check-circle"></i> Solicitar Ajuste
+          </button>
+          <button class="btn btn-ghost" type="button" onclick="fecharModalAjuste()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Histórico de Versões -->
+  <div id="modalHistorico" class="modal" role="dialog" aria-modal="true" aria-label="Histórico de versões">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="bi bi-clock-history"></i> Histórico de Versões</h3>
+        <button class="close-modal" type="button" onclick="fecharModalHistorico()">&times;</button>
+      </div>
+      <div id="conteudoHistorico" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal Ajustes Pendentes -->
+  <div id="modalAjustesPendentes" class="modal" role="dialog" aria-modal="true" aria-label="Ajustes pendentes">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="bi bi-bell"></i> Ajustes Pendentes de Aprovação</h3>
+        <button class="close-modal" type="button" onclick="fecharModalAjustesPendentes()">&times;</button>
+      </div>
+      <div id="conteudoAjustesPendentes" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação de Reprovação -->
+  <div id="modalConfirmarReprovacao" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirmar Reprovação</h3>
+        <button class="close-modal" type="button" onclick="fecharModalConfirmarReprovacao()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); margin-bottom: 20px;">
+          Tem certeza que deseja <strong style="color: #ef4444;">REPROVAR</strong> este ajuste?
+        </p>
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+          <p style="color: #ef4444; margin: 0; font-size: 0.9rem;">
+            <i class="bi bi-exclamation-triangle-fill"></i> Esta ação é PERMANENTE e não pode ser desfeita!
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="motivoReprovacao" style="display: block; margin-bottom: 8px; font-weight: 600;">
+            Motivo da Reprovação <span style="color: #ef4444;">*</span>
+          </label>
+          <textarea 
+            id="motivoReprovacao" 
+            rows="4" 
+            placeholder="Digite o motivo da reprovação..."
+            style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); resize: vertical; font-family: inherit;"
+          ></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" type="button" onclick="confirmarReprovacaoAjuste()">
+          <i class="bi bi-x-circle"></i> Reprovar
+        </button>
+        <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmarReprovacao()">
+          <i class="bi bi-x"></i> Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <footer class="app-footer">
-    Versão: V2.0 • © Desenvolvido por Seteg - Soluções Geológicas e Ambientais • 2026
+    Versão: V2.1 • © Desenvolvido por Seteg - Soluções Geológicas e Ambientais • 2026
   </footer>
+
+  <!-- Loader Global -->
+  <div id="globalLoader" class="global-loader" style="display: none;">
+    <div class="loader-content">
+      <div class="loader-spinner"></div>
+      <p class="loader-text">Carregando...</p>
+    </div>
+  </div>
 
   <!-- Entrada principal da aplicação -->
   <script src="js/app.js"></script>
+  
+  <!-- Integração do Versionamento -->
+  <script src="js/modules/versioning-integration.js"></script>
 </body>
 </html>
 

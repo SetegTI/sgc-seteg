@@ -8,6 +8,7 @@ import {
   remove,
   runTransaction,
   get,
+  push,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
 const firebaseConfig = {
@@ -26,5 +27,5 @@ const db = getDatabase(app);
 window.firebaseApp = app;
 window.db = db;
 window.dbRef = ref(db, "solicitacoes");
-window.firebaseFunctions = { ref, onValue, set, update, remove, runTransaction, get };
+window.firebaseFunctions = { ref, onValue, set, update, remove, runTransaction, get, push };
 

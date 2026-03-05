@@ -92,10 +92,18 @@ function formatDateBR(dateStr) {
 
 function formatarStatus(status) {
   const map = {
+    // Status principais da solicitação
     fila: "Na Fila",
     processando: "Processando",
     aguardando: "Aguardando Dados",
     finalizado: "Finalizado",
+    // Status de versionamento
+    criado: "Criado",
+    solicitado: "Aguardando Gestor",
+    atribuido: "Atribuído",
+    reprovado: "Reprovado",
+    em_andamento: "Em Andamento",
+    aguardando_aprovacao: "Aguardando Aprovação"
   };
   return map[status] || status;
 }
@@ -111,14 +119,17 @@ function formatarTipoMapa(tipo, nomeOutro) {
 
 function formatarNomeTecnico(codigo) {
   if (!codigo) return "Não atribuído";
+  
+  // Mapear códigos para nomes completos
   const nomes = {
-    LAIS: "Laís",
-    LAIZE: "Laíze",
-    VALESKA: "Valeska",
-    LIZABETH: "Lizabeth",
-    ISMAEL: "Ismael",
-    FERNANDO: "Fernando",
+    LAIS: "Laís Mendes",
+    LAIZE: "Laize Rodrigues",
+    VALESKA: "Valeska Soares",
+    LIZABETH: "Lizabeth Silva",
+    ISMAEL: "Ismael Alves",
+    FERNANDO: "Fernando Sousa",
   };
+  
   return nomes[codigo] || codigo;
 }
 
@@ -163,6 +174,23 @@ function mostrarNotificacao(mensagem, tipo = "info") {
     notif.classList.remove("show");
     setTimeout(() => notif.remove(), 300);
   }, 5000); // 5 segundos
+}
+
+// Funções do Loader Global
+function mostrarLoader(texto = "Carregando...") {
+  const loader = document.getElementById("globalLoader");
+  const loaderText = loader?.querySelector(".loader-text");
+  if (loader) {
+    if (loaderText) loaderText.textContent = texto;
+    loader.style.display = "flex";
+  }
+}
+
+function esconderLoader() {
+  const loader = document.getElementById("globalLoader");
+  if (loader) {
+    loader.style.display = "none";
+  }
 }
 
 function bindEnterNoModal(modal, callback) {
@@ -356,8 +384,21 @@ document.addEventListener("DOMContentLoaded", () => {
   // Fechar modais com ESC
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      // Fechar modal de histórico
+      const modalHistorico = document.getElementById('modalHistorico');
+      if (modalHistorico?.classList.contains('active')) {
+        window.fecharModalHistorico();
+      }
+      // Fechar modal de ajuste
+      else if (document.getElementById('modalAjuste')?.classList.contains('active')) {
+        window.fecharModalAjuste();
+      }
+      // Fechar modal de ajustes pendentes
+      else if (document.getElementById('modalAjustesPendentes')?.style.display === 'flex') {
+        fecharModalAjustesPendentes();
+      }
       // Fechar modal de detalhes
-      if (modalDetalhes?.classList.contains('active')) {
+      else if (modalDetalhes?.classList.contains('active')) {
         fecharModal();
       }
       // Fechar modal de acesso gestor
@@ -375,6 +416,10 @@ document.addEventListener("DOMContentLoaded", () => {
       // Fechar modal de confirmação
       else if (modalConfirmacao?.classList.contains('active')) {
         fecharModalConfirmacao();
+      }
+      // Fechar modal de confirmação de reprovação
+      else if (document.getElementById('modalConfirmarReprovacao')?.style.display === 'flex') {
+        fecharModalConfirmarReprovacao();
       }
       // Fechar modal de relatório
       else if (modalRelatorio?.classList.contains('active')) {
@@ -431,20 +476,39 @@ function carregarSolicitacoesFirebase() {
 
   if (!dbRef || !onValue) {
     console.error("Firebase: Não inicializado");
+    esconderLoader();
     return;
   }
+
+  mostrarLoader("Carregando solicitações...");
 
   onValue(dbRef, (snapshot) => {
     solicitacoes = [];
     if (snapshot.exists()) {
       snapshot.forEach((child) => {
-        solicitacoes.push({ id: child.key, ...child.val() });
+        const dados = child.val();
+        
+        // Se tem estrutura de versionamento, pegar dados da versão atual
+        if (dados.versoes && dados.versaoAtual) {
+          const versaoAtual = dados.versoes[dados.versaoAtual];
+          solicitacoes.push({ 
+            id: child.key, 
+            ...versaoAtual,
+            versaoAtual: dados.versaoAtual,
+            criadoPor: dados.criadoPor,
+            criadoEm: dados.criadoEm
+          });
+        } else {
+          // Formato antigo (não deve existir mais após limpeza)
+          solicitacoes.push({ id: child.key, ...dados });
+        }
       });
     }
     atualizarTabela();
     atualizarEstatisticas();
     atualizarListaTecnicos();
     atualizarEstatisticasTecnico();
+    esconderLoader();
   });
 }
 
@@ -462,11 +526,26 @@ function salvarSolicitacaoFirebase(dados) {
     const { set } = window.firebaseFunctions;
     const solRef = ref(db, `solicitacoes/${novoId}`);
 
-    set(solRef, {
-      ...dados,
-      id: novoId,
-      dataCriacao: new Date().toISOString(),
-    })
+    // Criar solicitação com estrutura de versionamento
+    const agora = new Date().toISOString();
+    const solicitacao = {
+      versaoAtual: 1,
+      criadoPor: dados.solicitante || "Sistema",
+      criadoEm: agora,
+      versoes: {
+        1: {
+          ...dados,
+          id: novoId,
+          status: dados.status || "fila",
+          dataSolicitacao: dados.dataSolicitacao || agora,
+          dataCriacao: agora,
+          solicitadoPor: dados.solicitante || "Sistema",
+          tecnicoResponsavel: dados.tecnicoResponsavel || "PENDENTE",
+        }
+      }
+    };
+
+    set(solRef, solicitacao)
       .then(() => {
         mostrarNotificacao("Solicitação criada com sucesso!", "success");
         limparForm();
@@ -484,19 +563,33 @@ function salvarSolicitacaoFirebase(dados) {
 }
 
 function atualizarSolicitacaoFirebase(id, dados) {
-  const { ref, update } = window.firebaseFunctions;
+  const { ref, update, get } = window.firebaseFunctions;
   const db = window.db;
 
   const solRef = ref(db, `solicitacoes/${id}`);
 
-  update(solRef, dados)
-    .then(() => {
-      // Atualização bem-sucedida
-    })
-    .catch((err) => {
-      console.error("Firebase: Erro ao atualizar", err);
-      mostrarNotificacao("Erro ao atualizar!", "error");
-    });
+  // Primeiro buscar a versão atual
+  get(solRef).then((snapshot) => {
+    if (snapshot.exists()) {
+      const solicitacao = snapshot.val();
+      const versaoAtual = solicitacao.versaoAtual || 1;
+      
+      // Atualizar na versão atual
+      const updates = {};
+      Object.keys(dados).forEach(key => {
+        updates[`versoes/${versaoAtual}/${key}`] = dados[key];
+      });
+      
+      update(solRef, updates)
+        .then(() => {
+          // Atualização bem-sucedida
+        })
+        .catch((err) => {
+          console.error("Firebase: Erro ao atualizar", err);
+          mostrarNotificacao("Erro ao atualizar!", "error");
+        });
+    }
+  });
 }
 
 function excluirSolicitacao(id) {
@@ -595,6 +688,38 @@ function salvarSolicitacao(e) {
   }
 
   const formData = new FormData(formSolicitacao);
+  
+  // Validação customizada: se "Outros" em Elementos do Croqui estiver marcado, o campo texto é obrigatório
+  const elementoOutros = formData.get("elementoOutros") === "on";
+  const elementoOutrosTexto = formData.get("elementoOutrosTexto")?.trim();
+  
+  if (elementoOutros && !elementoOutrosTexto) {
+    mostrarNotificacao("Por favor, especifique os outros elementos do croqui!", "warning");
+    const campoOutrosTexto = document.getElementById("elementoOutrosTexto");
+    if (campoOutrosTexto) {
+      campoOutrosTexto.focus();
+    }
+    return;
+  }
+
+  // Validação: Data de Entrega deve ser maior ou igual à Data de Solicitação
+  const dataSolicitacaoBR = formData.get("dataSolicitacao");
+  const dataEntregaBR = formData.get("dataEntrega");
+  
+  if (dataSolicitacaoBR && dataEntregaBR) {
+    const dataSolicitacaoISO = converterDataParaISO(dataSolicitacaoBR);
+    const dataEntregaISO = converterDataParaISO(dataEntregaBR);
+    
+    if (dataEntregaISO < dataSolicitacaoISO) {
+      mostrarNotificacao("A Data de Entrega não pode ser anterior à Data de Solicitação!", "warning");
+      const campoDataEntrega = document.getElementById("dataEntrega");
+      if (campoDataEntrega) {
+        campoDataEntrega.focus();
+      }
+      return;
+    }
+  }
+
   const dados = {
     solicitante: formData.get("solicitante"),
     cliente: formData.get("cliente"),
@@ -626,8 +751,8 @@ function salvarSolicitacao(e) {
       acessoLocal: formData.get("elementoAcessoLocal") === "on",
       acessoRegional: formData.get("elementoAcessoRegional") === "on",
       areaAmostral: formData.get("elementoAreaAmostral") === "on",
-      outros: formData.get("elementoOutros") === "on",
-      outrosTexto: formData.get("elementoOutrosTexto") || "",
+      outros: elementoOutros,
+      outrosTexto: elementoOutrosTexto || "",
     },
   };
 
@@ -647,6 +772,7 @@ function atualizarIndicadorLogin() {
   const btnGestor = document.getElementById("btnAcessoGestor");
   const btnTecnico = document.getElementById("btnAcessoTecnico");
   const cardNovaSolicitacao = document.getElementById("cardNovaSolicitacao");
+  const notificacoesAjustes = document.getElementById("notificacoesAjustes");
   
   if (acessoGestor) {
     indicator.style.display = "flex";
@@ -654,17 +780,23 @@ function atualizarIndicadorLogin() {
     btnGestor.style.display = "none";
     btnTecnico.style.display = "none";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
+    if (notificacoesAjustes) notificacoesAjustes.style.display = "block";
+    
+    // Atualizar contador de ajustes pendentes
+    setTimeout(() => atualizarContadorAjustesPendentes(), 500);
   } else if (acessoTecnico && tecnicoLogado) {
     indicator.style.display = "flex";
     loginText.innerHTML = `<i class="bi bi-person-circle"></i> Logado como <strong>${formatarNomeTecnico(tecnicoLogado)}</strong>`;
     btnGestor.style.display = "none";
     btnTecnico.style.display = "none";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
+    if (notificacoesAjustes) notificacoesAjustes.style.display = "none";
   } else {
     indicator.style.display = "none";
     btnGestor.style.display = "inline-flex";
     btnTecnico.style.display = "inline-flex";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "block";
+    if (notificacoesAjustes) notificacoesAjustes.style.display = "none";
   }
 }
 
@@ -899,17 +1031,21 @@ function verDetalhes(id) {
     return;
   }
 
-  const dataSolicitacao = formatDateBR(solicitacao.dataSolicitacao);
+  const dataSolicitacao = solicitacao.dataSolicitacao 
+    ? formatDateBR(solicitacao.dataSolicitacao)
+    : "—";
   const dataCriacao = solicitacao.dataCriacao
     ? new Date(solicitacao.dataCriacao).toLocaleString("pt-BR")
-    : "â€”";
-  const dataConclusaoPrevista = formatDateBR(solicitacao.dataConclusaoPrevista);
+    : "—";
   const dataConclusaoReal = solicitacao.dataConclusaoReal
     ? formatDateBR(solicitacao.dataConclusaoReal)
     : "Não concluída";
   const dataEntrega = solicitacao.dataEntrega
     ? formatDateBR(solicitacao.dataEntrega)
     : "Não informado";
+  const dataConclusaoPrevista = solicitacao.dataConclusaoPrevista
+    ? formatDateBR(solicitacao.dataConclusaoPrevista)
+    : "—";
 
   let statusPrazo = "";
   if (solicitacao.status === "finalizado" && solicitacao.dataConclusaoReal) {
@@ -964,6 +1100,13 @@ function verDetalhes(id) {
             <div class="detalhe-label">Criado em</div>
             <div class="detalhe-value">${escapeHtml(dataCriacao)}</div>
           </div>
+        </div>
+        
+        <!-- Botão Solicitar Ajuste - Visível para todos -->
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+          <button class="btn btn-primary" type="button" onclick="abrirModalAjuste(${solicitacao.id})" style="width: 100%;">
+            <i class="bi bi-pencil-square"></i> Solicitar Ajuste
+          </button>
         </div>
       </div>
 
@@ -1034,7 +1177,20 @@ function verDetalhes(id) {
         }
       })()}
 
-      <!-- Seção: Dados Gerais -->
+      ${(acessoGestor || acessoTecnico) ? `
+      <!-- Seção: Histórico de Versões -->
+      <div class="detalhe-section detalhe-historico">
+        <h4 class="detalhe-historico-title">
+          <i class="bi bi-clock-history"></i> Histórico de Versões
+        </h4>
+        <p style="color: var(--muted); margin-bottom: 16px;">
+          Visualize todas as versões e ajustes desta solicitação
+        </p>
+        <button class="btn btn-historico" type="button" onclick="abrirModalHistorico(${solicitacao.id})" style="width: 100%;">
+          <i class="bi bi-clock-history"></i> Ver Histórico Completo
+        </button>
+      </div>
+      ` : ""}
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-file-text"></i> Dados Gerais</h4>
         <div class="detalhe-grid">
@@ -1381,10 +1537,10 @@ function confirmarExclusao(id) {
       Esta ação NÃO pode ser desfeita!
     </p>
     <div class="btn-group" style="margin-top: 16px;">
-      <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
       <button class="btn btn-danger" type="button" onclick="excluirSolicitacao(${Number(
         id
       )})">Excluir</button>
+      <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
     </div>
   `;
 
@@ -1874,7 +2030,7 @@ function formatDateBR(dateOrStr) {
     typeof dateOrStr === "string" ? parseDateOnly(dateOrStr) : dateOrStr;
   return d instanceof Date && !isNaN(d)
     ? d.toLocaleDateString("pt-BR")
-    : "â€”";
+    : "-";
 }
 
 
@@ -1902,6 +2058,9 @@ window.atualizarTabela = atualizarTabela;
 window.verDetalhes = verDetalhes;
 window.fecharModal = fecharModal;
 
+window.mostrarLoader = mostrarLoader;
+window.esconderLoader = esconderLoader;
+
 window.abrirModalAtribuicao = abrirModalAtribuicao;
 window.fecharModalAtribuicao = fecharModalAtribuicao;
 window.atribuirTecnico = atribuirTecnico;
@@ -1913,6 +2072,15 @@ window.finalizarSolicitacao = finalizarSolicitacao;
 window.confirmarExclusao = confirmarExclusao;
 window.fecharModalConfirmacao = fecharModalConfirmacao;
 window.excluirSolicitacao = excluirSolicitacao;
+
+window.fecharModalConfirmarReprovacao = fecharModalConfirmarReprovacao;
+window.confirmarReprovacaoAjuste = confirmarReprovacaoAjuste;
+
+window.atualizarContadorAjustesPendentes = atualizarContadorAjustesPendentes;
+window.abrirModalAjustesPendentes = abrirModalAjustesPendentes;
+window.fecharModalAjustesPendentes = fecharModalAjustesPendentes;
+window.aprovarAjusteModal = aprovarAjusteModal;
+window.reprovarAjusteModal = reprovarAjusteModal;
 
 window.abrirModalRelatorio = abrirModalRelatorio;
 window.fecharModalRelatorio = fecharModalRelatorio;
@@ -2002,4 +2170,428 @@ function converterDataParaBR(dataISO) {
   const partes = dataISO.split('-');
   if (partes.length !== 3) return '';
   return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+
+// =======================================================
+//  SISTEMA DE NOTIFICAÇÕES DE AJUSTES PENDENTES
+// =======================================================
+
+/**
+ * Atualiza o contador de ajustes pendentes
+ */
+async function atualizarContadorAjustesPendentes() {
+  if (!acessoGestor) {
+    const notifDiv = document.getElementById("notificacoesAjustes");
+    if (notifDiv) notifDiv.style.display = "none";
+    return;
+  }
+
+  try {
+    // Buscar todos os ajustes pendentes de todas as solicitações
+    let totalPendentes = 0;
+    
+    for (const solicitacao of solicitacoes) {
+      const ajustes = await window.versioningModule.obterAjustesPendentes(solicitacao.id);
+      const pendentes = ajustes.filter(a => a.status === 'aguardando_aprovacao');
+      totalPendentes += pendentes.length;
+    }
+
+    const notifDiv = document.getElementById("notificacoesAjustes");
+    const badge = document.getElementById("badgeAjustesPendentes");
+    
+    if (notifDiv) {
+      notifDiv.style.display = "block";
+    }
+    
+    if (badge) {
+      if (totalPendentes > 0) {
+        badge.textContent = totalPendentes;
+        badge.style.display = "flex";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+  } catch (error) {
+    console.error("Erro ao atualizar contador de ajustes:", error);
+  }
+}
+
+/**
+ * Abre modal com todos os ajustes pendentes
+ */
+async function abrirModalAjustesPendentes() {
+  if (!acessoGestor) {
+    mostrarNotificacao("Apenas gestores podem ver ajustes pendentes!", "warning");
+    return;
+  }
+
+  const modal = document.getElementById("modalAjustesPendentes");
+  const conteudo = document.getElementById("conteudoAjustesPendentes");
+  
+  if (!modal || !conteudo) return;
+
+  try {
+    // Mostrar loading
+    conteudo.innerHTML = `
+      <div style="text-align: center; padding: 40px;">
+        <i class="bi bi-hourglass-split" style="font-size: 3rem; color: var(--primary);"></i>
+        <p style="margin-top: 16px; color: var(--muted);">Carregando ajustes pendentes...</p>
+      </div>
+    `;
+    
+    modal.classList.add("active");
+
+    // Buscar todos os ajustes pendentes
+    const ajustesPorSolicitacao = [];
+    
+    for (const solicitacao of solicitacoes) {
+      const ajustes = await window.versioningModule.obterAjustesPendentes(solicitacao.id);
+      const pendentes = ajustes.filter(a => a.status === 'aguardando_aprovacao');
+      
+      if (pendentes.length > 0) {
+        ajustesPorSolicitacao.push({
+          solicitacao,
+          ajustes: pendentes
+        });
+      }
+    }
+
+    if (ajustesPorSolicitacao.length === 0) {
+      conteudo.innerHTML = `
+        <div class="ajustes-empty-state">
+          <i class="bi bi-check-circle ajustes-empty-icon"></i>
+          <p class="ajustes-empty-text">Nenhum ajuste pendente</p>
+          <p class="ajustes-empty-subtext">Todos os ajustes foram processados</p>
+        </div>
+        <div class="btn-group" style="margin-top: 24px;">
+          <button class="btn btn-ghost" type="button" onclick="fecharModalAjustesPendentes()">
+            <i class="bi bi-x-circle"></i> Fechar
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <div style="margin-bottom: 24px;">
+        <p style="color: var(--muted); font-size: 0.95rem;">
+          <i class="bi bi-info-circle"></i> 
+          ${ajustesPorSolicitacao.length} solicitação(ões) com ajustes pendentes de aprovação
+        </p>
+      </div>
+    `;
+
+    ajustesPorSolicitacao.forEach(({ solicitacao, ajustes }) => {
+      ajustes.forEach(ajuste => {
+        html += `
+          <div class="ajuste-pendente-card">
+            <div class="ajuste-pendente-header">
+              <div class="ajuste-pendente-info">
+                <div class="ajuste-pendente-solicitacao">
+                  Solicitação #${String(solicitacao.id).padStart(4, "0")}
+                </div>
+                <div style="color: var(--text); font-size: 0.9rem; margin-top: 4px;">
+                  ${escapeHtml(solicitacao.nomeEstudo || "Sem nome")} - ${escapeHtml(solicitacao.cliente || "")}
+                </div>
+                <div class="ajuste-pendente-meta">
+                  <span style="display: flex; align-items: center; gap: 6px;">
+                    <i class="bi bi-person"></i>
+                    ${escapeHtml(ajuste.solicitadoPor)}
+                  </span>
+                  <span style="display: flex; align-items: center; gap: 6px;">
+                    <i class="bi bi-calendar"></i>
+                    ${new Date(ajuste.dataSolicitacao).toLocaleString('pt-BR')}
+                  </span>
+                </div>
+              </div>
+              <span class="status-badge status-aguardando" style="display: flex; align-items: center; gap: 6px;">
+                <i class="bi bi-clock"></i> Aguardando
+              </span>
+            </div>
+
+            <div class="ajuste-pendente-content">
+              ${ajuste.tipoAjuste ? `
+              <div class="ajuste-pendente-field">
+                <div class="ajuste-pendente-field-label">Tipo de Ajuste</div>
+                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.tipoAjuste)}</div>
+              </div>
+              ` : ''}
+
+              ${ajuste.observacoes ? `
+              <div class="ajuste-pendente-field">
+                <div class="ajuste-pendente-field-label">Observações</div>
+                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.observacoes)}</div>
+              </div>
+              ` : ''}
+
+              ${ajuste.diretorioReferencia ? `
+              <div class="ajuste-pendente-field">
+                <div class="ajuste-pendente-field-label">Diretório de Referência</div>
+                <div class="ajuste-pendente-field-value" style="font-family: monospace; font-size: 0.85rem;">
+                  ${escapeHtml(ajuste.diretorioReferencia)}
+                </div>
+              </div>
+              ` : ''}
+
+              ${ajuste.diretorioSalvamento ? `
+              <div class="ajuste-pendente-field">
+                <div class="ajuste-pendente-field-label">Diretório de Salvamento</div>
+                <div class="ajuste-pendente-field-value" style="font-family: monospace; font-size: 0.85rem;">
+                  ${escapeHtml(ajuste.diretorioSalvamento)}
+                </div>
+              </div>
+              ` : ''}
+
+              ${ajuste.prazoFinal ? `
+              <div class="ajuste-pendente-field">
+                <div class="ajuste-pendente-field-label">Novo Prazo Final</div>
+                <div class="ajuste-pendente-field-value">
+                  ${formatDateBR(ajuste.prazoFinal)}
+                </div>
+              </div>
+              ` : ''}
+            </div>
+
+            <div class="ajuste-pendente-actions">
+              <button class="btn btn-success" type="button" onclick="aprovarAjusteModal(${solicitacao.id}, '${ajuste.id}')">
+                <i class="bi bi-check-circle"></i> Aprovar
+              </button>
+              <button class="btn btn-danger" type="button" onclick="reprovarAjusteModal(${solicitacao.id}, '${ajuste.id}')">
+                <i class="bi bi-x-circle"></i> Reprovar
+              </button>
+              <button class="btn btn-info" type="button" onclick="verDetalhesSolicitacao(${solicitacao.id})">
+                <i class="bi bi-eye"></i> Ver Solicitação
+              </button>
+            </div>
+          </div>
+        `;
+      });
+    });
+
+    html += `
+      <div class="btn-group" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+        <button class="btn btn-ghost" type="button" onclick="fecharModalAjustesPendentes()">
+          <i class="bi bi-x-circle"></i> Fechar
+        </button>
+      </div>
+    `;
+
+    conteudo.innerHTML = html;
+  } catch (error) {
+    console.error("Erro ao carregar ajustes pendentes:", error);
+    conteudo.innerHTML = `
+      <div style="text-align: center; padding: 40px;">
+        <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: var(--danger);"></i>
+        <p style="margin-top: 16px; color: var(--text);">Erro ao carregar ajustes pendentes</p>
+        <p style="margin-top: 8px; color: var(--muted); font-size: 0.9rem;">${error.message}</p>
+        <button class="btn btn-ghost" type="button" onclick="fecharModalAjustesPendentes()" style="margin-top: 16px;">
+          Fechar
+        </button>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Fecha modal de ajustes pendentes
+ */
+function fecharModalAjustesPendentes() {
+  const modal = document.getElementById("modalAjustesPendentes");
+  if (modal) {
+    modal.classList.remove("active");
+  }
+}
+
+/**
+ * Ver detalhes da solicitação (fecha modal de ajustes e abre detalhes)
+ */
+function verDetalhesSolicitacao(idSolicitacao) {
+  fecharModalAjustesPendentes();
+  setTimeout(() => verDetalhes(idSolicitacao), 300);
+}
+
+/**
+ * Aprovar ajuste do modal de notificações
+ */
+async function aprovarAjusteModal(idSolicitacao, idAjuste) {
+  if (!acessoGestor) {
+    mostrarNotificacao("Apenas gestores podem aprovar ajustes!", "warning");
+    return;
+  }
+
+  // Fechar modal de ajustes pendentes
+  fecharModalAjustesPendentes();
+  
+  // Abrir modal de atribuição
+  setTimeout(() => {
+    window.abrirModalAtribuicaoAjuste(idSolicitacao, idAjuste);
+  }, 300);
+}
+
+/**
+ * Reprovar ajuste do modal de notificações
+ */
+let ajusteParaReprovar = null;
+
+async function reprovarAjusteModal(idSolicitacao, idAjuste) {
+  if (!acessoGestor) {
+    mostrarNotificacao("Apenas gestores podem reprovar ajustes!", "warning");
+    return;
+  }
+
+  // Guardar IDs para usar na confirmação
+  ajusteParaReprovar = { idSolicitacao, idAjuste };
+  
+  // Limpar campo de motivo
+  const motivoInput = document.getElementById("motivoReprovacao");
+  if (motivoInput) motivoInput.value = "";
+  
+  // Abrir modal de confirmação
+  const modal = document.getElementById("modalConfirmarReprovacao");
+  if (modal) {
+    modal.style.display = "flex";
+    setTimeout(() => motivoInput?.focus(), 100);
+  }
+}
+
+function fecharModalConfirmarReprovacao() {
+  const modal = document.getElementById("modalConfirmarReprovacao");
+  if (modal) modal.style.display = "none";
+  ajusteParaReprovar = null;
+}
+
+async function confirmarReprovacaoAjuste() {
+  if (!ajusteParaReprovar) return;
+  
+  const motivoInput = document.getElementById("motivoReprovacao");
+  const motivo = motivoInput?.value?.trim();
+  
+  if (!motivo) {
+    mostrarNotificacao("O motivo da reprovação é obrigatório!", "warning");
+    motivoInput?.focus();
+    return;
+  }
+
+  try {
+    await window.versioningModule.reprovarAjustePendente(
+      ajusteParaReprovar.idSolicitacao,
+      ajusteParaReprovar.idAjuste,
+      "Gestor",
+      motivo
+    );
+
+    mostrarNotificacao("Ajuste reprovado com sucesso!", "warning");
+    
+    // Fechar modal
+    fecharModalConfirmarReprovacao();
+    
+    // Atualizar contador
+    await atualizarContadorAjustesPendentes();
+    
+    // Reabrir modal de ajustes pendentes
+    setTimeout(() => abrirModalAjustesPendentes(), 500);
+  } catch (error) {
+    console.error("Erro ao reprovar ajuste:", error);
+    mostrarNotificacao("Erro ao reprovar ajuste: " + error.message, "error");
+  }
+}
+
+// Atualizar contador quando carregar solicitações
+const carregarSolicitacoesOriginal = carregarSolicitacoesFirebase;
+carregarSolicitacoesFirebase = function() {
+  carregarSolicitacoesOriginal();
+  
+  // Atualizar contador após carregar solicitações
+  setTimeout(() => {
+    if (acessoGestor) {
+      atualizarContadorAjustesPendentes();
+    }
+  }, 1000);
+};
+
+
+/**
+ * Abre modal customizado para confirmar reprovação
+ */
+function abrirModalConfirmacaoReprovar(idSolicitacao, idAjuste) {
+  const modal = document.getElementById("modalConfirmacao");
+  const conteudo = document.getElementById("conteudoConfirmacao");
+  
+  if (!modal || !conteudo) return;
+
+  conteudo.innerHTML = `
+    <div style="text-align: center; padding: 20px 0;">
+      <i class="bi bi-exclamation-triangle" style="font-size: 4rem; color: var(--danger);"></i>
+      <h3 style="margin-top: 16px; color: var(--text);">Reprovar Ajuste</h3>
+      <p style="margin-top: 12px; color: var(--muted); line-height: 1.6;">
+        Tem certeza que deseja <strong style="color: var(--danger);">REPROVAR</strong> este ajuste?
+      </p>
+      <p style="margin-top: 8px; color: var(--warning); font-weight: 600;">
+        ⚠️ Esta ação é PERMANENTE e não pode ser desfeita!
+      </p>
+    </div>
+
+    <div class="form-group" style="margin-top: 20px;">
+      <label for="motivoReprovacao">Motivo da Reprovação *</label>
+      <textarea 
+        id="motivoReprovacao" 
+        rows="4" 
+        placeholder="Digite o motivo da reprovação..." 
+        required
+        style="width: 100%;"
+      ></textarea>
+      <small class="help">Obrigatório - Explique o motivo para o solicitante</small>
+    </div>
+
+    <div class="btn-group" style="margin-top: 20px;">
+      <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">
+        <i class="bi bi-x-circle"></i> Cancelar
+      </button>
+      <button class="btn btn-danger" type="button" onclick="confirmarReprovarAjuste(${idSolicitacao}, '${idAjuste}')">
+        <i class="bi bi-x-circle-fill"></i> Confirmar Reprovação
+      </button>
+    </div>
+  `;
+
+  modal.classList.add("active");
+  
+  // Focar no textarea
+  setTimeout(() => {
+    document.getElementById("motivoReprovacao")?.focus();
+  }, 100);
+}
+
+/**
+ * Confirma a reprovação do ajuste
+ */
+async function confirmarReprovarAjuste(idSolicitacao, idAjuste) {
+  const motivo = document.getElementById("motivoReprovacao")?.value.trim();
+  
+  if (!motivo) {
+    mostrarNotificacao("Digite o motivo da reprovação!", "warning");
+    return;
+  }
+
+  try {
+    await window.versioningModule.reprovarAjustePendente(
+      idSolicitacao,
+      idAjuste,
+      "Gestor",
+      motivo
+    );
+
+    mostrarNotificacao("Ajuste reprovado com sucesso!", "warning");
+    
+    fecharModalConfirmacao();
+    
+    // Atualizar contador
+    await atualizarContadorAjustesPendentes();
+    
+    // Reabrir modal de ajustes pendentes
+    setTimeout(() => abrirModalAjustesPendentes(), 500);
+  } catch (error) {
+    console.error("Erro ao reprovar ajuste:", error);
+    mostrarNotificacao("Erro ao reprovar ajuste: " + error.message, "error");
+  }
 }
