@@ -2,13 +2,6 @@
 
 Sistema de gerenciamento de solicitações cartográficas desenvolvido para o Setor Geoambiental.
 
-## 🚀 Como Usar
-
-### Localmente
-
-1. Execute o arquivo `iniciar-servidor-e-abrir.bat`
-2. O navegador abrirá automaticamente em `http://localhost:8080`
-
 ### GitHub Pages
 
 1. O site está disponível em `https://setegti.github.io/sgc-seteg/`
@@ -42,11 +35,3 @@ sgc-seteg/
     ├── images/            # Imagens (logos, backgrounds)
     └── icons/             # Ícones
 ```
-
-## 📝 Versão
-
-R02 - Fevereiro/2026
-
----
-
-Desenvolvido pelo Setor Geoambiental - Laís Mendes e Ricardo Junior
