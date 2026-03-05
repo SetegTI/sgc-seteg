@@ -1,38 +1,12 @@
-// SGC SETEG - Módulo de Versionamento de Ajustes
-// versioning-module.js - Sistema de versionamento para solicitações
+// SGC SETEG - Versionamento de Ajustes
+// Gerencia versões e ajustes das solicitações
 
-/**
- * Estrutura no Firebase:
- * solicitacoes/
- *   {idSolicitacao}/
- *     versaoAtual: number
- *     criadoPor: string
- *     criadoEm: timestamp
- *     versoes/
- *       1/
- *         diretorioReferencia: string
- *         diretorioSalvamento: string
- *         tipoAjuste: string
- *         observacoes: string
- *         prazoFinal: string
- *         dataSolicitacao: timestamp
- *         status: string
- *         solicitadoPor: string
- *         tecnicoResponsavel: string
- *         aprovadoPor: string (opcional)
- *       2/
- *         ... (mesma estrutura)
- */
+// Estrutura no Firebase:
+// solicitacoes/{id}/versaoAtual, criadoPor, criadoEm
+// solicitacoes/{id}/versoes/{n}/ - dados de cada versão
+// solicitacoes/{id}/ajustesPendentes/{id}/ - ajustes aguardando aprovação
 
-// =======================================================
-//  1. CRIAR SOLICITAÇÃO INICIAL
-// =======================================================
-
-/**
- * Cria uma nova solicitação com versionamento
- * @param {Object} dados - Dados da solicitação inicial
- * @returns {Promise<number>} ID da solicitação criada
- */
+// Criar solicitação inicial
 export async function criarSolicitacaoInicial(dados) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -42,7 +16,7 @@ export async function criarSolicitacaoInicial(dados) {
   const db = window.db;
 
   try {
-    // Incrementar contador e obter novo ID
+    // Pega próximo ID
     const contadorRef = ref(db, "contador");
     const result = await runTransaction(contadorRef, (atual) => {
       return (atual || 0) + 1;

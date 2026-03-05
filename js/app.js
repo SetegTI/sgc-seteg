@@ -1549,9 +1549,7 @@ function fecharModalConfirmacao() {
   modalConfirmacao?.classList.remove("active");
 }
 
-// =======================================================
-//  RELATÓRIOS / FILTROS
-// =======================================================
+// Relatórios e Filtros
 function filtrarSolicitacoes(tipo) {
   let statusFiltro = null;
   switch (tipo) {
@@ -1872,9 +1870,7 @@ function exportarTodosDados() {
   mostrarNotificacao("Todos os dados exportados!", "success");
 }
 
-// =======================================================
-//  ESTATÍSTICAS
-// =======================================================
+// Estatísticas
 function atualizarEstatisticas() {
   const base =
     acessoTecnico && tecnicoLogado
@@ -2005,9 +2001,7 @@ function atualizarEstatisticasTecnico() {
   `;
 }
 
-// =======================================================
-//  HELPERS / UTILITÁRIOS
-// =======================================================
+// Helpers
 function bindEnterNoModal(modalEl, callback) {
   if (!modalEl) return;
   modalEl.addEventListener("keydown", (e) => {
@@ -2032,10 +2026,7 @@ function formatDateBR(dateOrStr) {
 }
 
 
-// =======================================================
-//  EXPORTS GLOBAIS (para handlers inline no HTML)
-//  IMPORTANTE: Devem estar NO FINAL, após todas as funções
-// =======================================================
+// Exports globais (handlers inline do HTML)
 window.toggleForm = toggleForm;
 window.limparForm = limparForm;
 window.toggleTipoMapaOutros = toggleTipoMapaOutros;
@@ -2171,14 +2162,8 @@ function converterDataParaBR(dataISO) {
 }
 
 
-// =======================================================
-//  SISTEMA DE NOTIFICAÇÕES DE AJUSTES PENDENTES
-// =======================================================
-
-/**
- * Atualiza o contador de ajustes pendentes
- */
-async function atualizarContadorAjustesPendentes() {
+// Sistema de Notificações de Ajustes
+function atualizarContadorAjustesPendentes() {
   if (!acessoGestor) {
     const notifDiv = document.getElementById("notificacoesAjustes");
     if (notifDiv) notifDiv.style.display = "none";
@@ -2215,9 +2200,7 @@ async function atualizarContadorAjustesPendentes() {
   }
 }
 
-/**
- * Abre modal com todos os ajustes pendentes
- */
+// Abre modal com ajustes pendentes
 async function abrirModalAjustesPendentes() {
   if (!acessoGestor) {
     mostrarNotificacao("Apenas gestores podem ver ajustes pendentes!", "warning");
