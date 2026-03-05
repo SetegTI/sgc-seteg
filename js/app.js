@@ -1374,16 +1374,14 @@ function mudarStatus(id, novoStatus) {
 }
 
 function salvarNovoStatus(id) {
-  console.log("🔧 salvarNovoStatus chamado - ID:", id, "Tipo:", typeof id);
   const select = document.getElementById(`selectEstagio${id}`);
-  console.log("🔧 Select encontrado:", select);
+  
   if (!select) {
-    console.error("❌ Select não encontrado para ID:", id);
+    console.error("Select não encontrado para ID:", id);
     return;
   }
   
   const novoStatus = select.value;
-  console.log("🔧 Novo status selecionado:", novoStatus);
   mudarStatus(id, novoStatus);
 }
 function finalizarSolicitacao(id) {

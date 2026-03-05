@@ -695,5 +695,5 @@ window.finalizarVersaoModal = async function(idSolicitacao, versao) {
 
 // Aguardar o DOM estar pronto
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("✓ Módulo de integração de versionamento carregado");
+  // Módulo carregado
 });
