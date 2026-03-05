@@ -2163,7 +2163,7 @@ function converterDataParaBR(dataISO) {
 
 
 // Sistema de Notificações de Ajustes
-function atualizarContadorAjustesPendentes() {
+async function atualizarContadorAjustesPendentes() {
   if (!acessoGestor) {
     const notifDiv = document.getElementById("notificacoesAjustes");
     if (notifDiv) notifDiv.style.display = "none";
