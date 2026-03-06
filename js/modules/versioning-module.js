@@ -4,7 +4,6 @@
  * Empresa: SETEG
  */
 
-// Versionamento de Ajustes
 // Gerencia versões e ajustes das solicitações
 
 // Criar solicitação inicial
@@ -52,17 +51,7 @@ export async function criarSolicitacaoInicial(dados) {
   }
 }
 
-// =======================================================
-//  2. SOLICITAR AJUSTE (CRIAR NOVA VERSÃO)
-// =======================================================
-
-/**
- * Solicita um ajuste (não cria versão ainda, apenas registra a solicitação)
- * @param {number} idSolicitacao - ID da solicitação
- * @param {Object} dadosAjuste - Dados do ajuste a ser aplicado
- * @param {string} usuario - Usuário que está solicitando o ajuste
- * @returns {Promise<string>} ID da solicitação de ajuste criada
- */
+// Solicitar ajuste (registra solicitação, não cria versão ainda)
 export async function solicitarAjuste(idSolicitacao, dadosAjuste, usuario) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -135,18 +124,7 @@ export async function solicitarAjuste(idSolicitacao, dadosAjuste, usuario) {
   }
 }
 
-// =======================================================
-//  3. APROVAR AJUSTE (CRIA NOVA VERSÃO)
-// =======================================================
-
-/**
- * Aprova um ajuste pendente e cria nova versão
- * @param {number} idSolicitacao - ID da solicitação
- * @param {string} idAjuste - ID do ajuste pendente
- * @param {string} gestor - Nome do gestor que está aprovando
- * @param {string} tecnico - Código do técnico responsável
- * @returns {Promise<number>} Número da nova versão criada
- */
+// Aprovar ajuste pendente e criar nova versão
 export async function aprovarAjustePendente(idSolicitacao, idAjuste, gestor, tecnico) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -208,18 +186,7 @@ export async function aprovarAjustePendente(idSolicitacao, idAjuste, gestor, tec
   }
 }
 
-// =======================================================
-//  4. REPROVAR AJUSTE
-// =======================================================
-
-/**
- * Reprova um ajuste pendente
- * @param {number} idSolicitacao - ID da solicitação
- * @param {string} idAjuste - ID do ajuste pendente
- * @param {string} gestor - Nome do gestor que está reprovando
- * @param {string} motivo - Motivo da reprovação
- * @returns {Promise<void>}
- */
+// Reprovar ajuste pendente
 export async function reprovarAjustePendente(idSolicitacao, idAjuste, gestor, motivo) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -245,15 +212,7 @@ export async function reprovarAjustePendente(idSolicitacao, idAjuste, gestor, mo
   }
 }
 
-// =======================================================
-//  5. OBTER AJUSTES PENDENTES
-// =======================================================
-
-/**
- * Retorna todos os ajustes pendentes de uma solicitação
- * @param {number} idSolicitacao - ID da solicitação
- * @returns {Promise<Array>} Array de ajustes pendentes
- */
+// Obter ajustes pendentes de uma solicitação
 export async function obterAjustesPendentes(idSolicitacao) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -285,16 +244,7 @@ export async function obterAjustesPendentes(idSolicitacao) {
   }
 }
 
-// =======================================================
-//  6. INICIAR AJUSTE
-// =======================================================
-
-/**
- * Marca o ajuste como em andamento
- * @param {number} idSolicitacao - ID da solicitação
- * @param {number} versao - Número da versão
- * @returns {Promise<void>}
- */
+// Iniciar ajuste (marca como em andamento)
 export async function iniciarAjuste(idSolicitacao, versao) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -318,16 +268,7 @@ export async function iniciarAjuste(idSolicitacao, versao) {
   }
 }
 
-// =======================================================
-//  6. FINALIZAR AJUSTE
-// =======================================================
-
-/**
- * Marca o ajuste como finalizado
- * @param {number} idSolicitacao - ID da solicitação
- * @param {number} versao - Número da versão
- * @returns {Promise<void>}
- */
+// Finalizar ajuste
 export async function finalizarAjuste(idSolicitacao, versao) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -351,15 +292,7 @@ export async function finalizarAjuste(idSolicitacao, versao) {
   }
 }
 
-// =======================================================
-//  7. OBTER HISTÓRICO DA SOLICITAÇÃO
-// =======================================================
-
-/**
- * Retorna o histórico completo de uma solicitação
- * @param {number} idSolicitacao - ID da solicitação
- * @returns {Promise<Object>} Objeto com versaoAtual e array de versoes ordenadas
- */
+// Obter histórico completo da solicitação
 export async function obterHistoricoSolicitacao(idSolicitacao) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -401,16 +334,7 @@ export async function obterHistoricoSolicitacao(idSolicitacao) {
   }
 }
 
-// =======================================================
-//  8. OBTER VERSÃO ESPECÍFICA
-// =======================================================
-
-/**
- * Retorna os dados de uma versão específica
- * @param {number} idSolicitacao - ID da solicitação
- * @param {number} versao - Número da versão
- * @returns {Promise<Object>} Dados da versão
- */
+// Obter versão específica
 export async function obterVersao(idSolicitacao, versao) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -437,15 +361,7 @@ export async function obterVersao(idSolicitacao, versao) {
   }
 }
 
-// =======================================================
-//  9. OBTER VERSÃO ATUAL
-// =======================================================
-
-/**
- * Retorna os dados da versão atual (ativa)
- * @param {number} idSolicitacao - ID da solicitação
- * @returns {Promise<Object>} Dados da versão atual
- */
+// Obter versão atual (ativa)
 export async function obterVersaoAtual(idSolicitacao) {
   if (!window.db || !window.firebaseFunctions) {
     throw new Error("Firebase não inicializado");
@@ -472,15 +388,9 @@ export async function obterVersaoAtual(idSolicitacao) {
   }
 }
 
-// =======================================================
-//  10. HELPERS / UTILITÁRIOS
-// =======================================================
+// Helpers e utilitários
 
-/**
- * Formata o status da versão para exibição
- * @param {string} status - Status da versão
- * @returns {string} Status formatado
- */
+// Formatar status da versão
 export function formatarStatusVersao(status) {
   const statusMap = {
     criado: "Criado",
@@ -497,11 +407,7 @@ export function formatarStatusVersao(status) {
   return statusMap[status] || status;
 }
 
-/**
- * Retorna a classe CSS para o status
- * @param {string} status - Status da versão
- * @returns {string} Classe CSS
- */
+// Obter classe CSS do status
 export function obterClasseStatus(status) {
   const classMap = {
     criado: "status-fila",
@@ -518,39 +424,23 @@ export function obterClasseStatus(status) {
   return classMap[status] || "status-fila";
 }
 
-/**
- * Verifica se uma versão pode ser editada
- * @param {Object} versao - Dados da versão
- * @returns {boolean} True se pode ser editada
- */
+// Verificar se versão pode ser editada
 export function podeEditarVersao(versao) {
   const statusEditaveis = ["criado", "solicitado", "reprovado"];
   return statusEditaveis.includes(versao.status);
 }
 
-/**
- * Verifica se uma versão pode ser aprovada
- * @param {Object} versao - Dados da versão
- * @returns {boolean} True se pode ser aprovada
- */
+// Verificar se versão pode ser aprovada
 export function podeAprovarVersao(versao) {
   return versao.status === "solicitado";
 }
 
-/**
- * Verifica se uma versão pode ser iniciada
- * @param {Object} versao - Dados da versão
- * @returns {boolean} True se pode ser iniciada
- */
+// Verificar se versão pode ser iniciada
 export function podeIniciarVersao(versao) {
   return versao.status === "atribuido";
 }
 
-/**
- * Verifica se uma versão pode ser finalizada
- * @param {Object} versao - Dados da versão
- * @returns {boolean} True se pode ser finalizada
- */
+// Verificar se versão pode ser finalizada
 export function podeFinalizarVersao(versao) {
   return versao.status === "em_andamento";
 }

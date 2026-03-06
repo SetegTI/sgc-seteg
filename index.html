@@ -233,7 +233,10 @@
 
               <div class="form-group">
                 <label for="observacoes">Observações / Requisitos Especiais</label>
-                <textarea id="observacoes" name="observacoes" placeholder="Descreva requisitos adicionais, informações importantes, prazos específicos, etc."></textarea>
+                <textarea id="observacoes" name="observacoes" maxlength="1000" placeholder="Descreva requisitos adicionais, informações importantes, prazos específicos, etc."></textarea>
+                <small class="help" id="helpObservacoes">
+                  <span class="char-counter"><span class="char-count">0</span>/1000 caracteres</span>
+                </small>
               </div>
 
               <div class="section-title"><i class="bi bi-box-seam"></i> Produtos Solicitados</div>
@@ -292,12 +295,12 @@
                 </div>
               </div>
 
-              <div class="btn-group">
-                <button type="submit" class="btn btn-primary">
-                  <i class="bi bi-check-circle"></i> Salvar Solicitação
-                </button>
+              <div class="btn-group justify-end">
                 <button type="button" class="btn btn-ghost" id="btnLimparForm">
                   <i class="bi bi-arrow-clockwise"></i> Limpar Formulário
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-check-circle"></i> Salvar Solicitação
                 </button>
               </div>
             </form>
@@ -307,7 +310,7 @@
         <!-- Lista -->
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Minhas Solicitações</h2>
+            <h2 class="card-title" id="tituloSolicitacoes">Todas as Solicitações</h2>
             <div class="tabs" role="tablist" aria-label="Filtros por status">
               <button class="tab-btn active" data-tab="todas" type="button" role="tab">Todas</button>
               <button class="tab-btn" data-tab="fila" type="button" role="tab">Na Fila</button>
@@ -375,7 +378,7 @@
             <div id="estatisticasTecnico"></div>
           </div>
           <div class="btn-group" style="margin-top: 20px;">
-            <button class="btn btn-primary btn-block" type="button" onclick="atualizarTabela('todas')">
+            <button class="btn btn-primary btn-block" type="button" onclick="atualizarTabela()">
               <i class="bi bi-arrow-clockwise"></i> Atualizar Lista
             </button>
           </div>
@@ -458,9 +461,9 @@
           </div>
           <small class="help">Apenas gestores possuem este código</small>
         </div>
-        <div class="btn-group" style="margin-top: 16px;">
-          <button class="btn btn-primary" type="button" onclick="validarCodigoAcesso()">Acessar</button>
+        <div class="btn-group justify-end" style="margin-top: 16px;">
           <button class="btn btn-ghost" type="button" onclick="fecharModalAcessoGestor()">Cancelar</button>
+          <button class="btn btn-primary" type="button" onclick="validarCodigoAcesso()">Acessar</button>
         </div>
       </div>
     </div>
@@ -497,9 +500,9 @@
           </div>
           <small class="help">Digite seu código pessoal</small>
         </div>
-        <div class="btn-group" style="margin-top: 16px;">
-          <button class="btn btn-primary" type="button" onclick="validarAcessoTecnico()">Acessar</button>
+        <div class="btn-group justify-end" style="margin-top: 16px;">
           <button class="btn btn-ghost" type="button" onclick="fecharModalAcessoTecnico()">Cancelar</button>
+          <button class="btn btn-primary" type="button" onclick="validarAcessoTecnico()">Acessar</button>
         </div>
       </div>
     </div>
@@ -546,9 +549,9 @@
             </span>
           </div>
         </div>
-        <div class="btn-group" style="margin-top: 14px;">
-          <button class="btn btn-success" type="button" onclick="gerarRelatorio()">Gerar Relatório Completo</button>
+        <div class="btn-group justify-end" style="margin-top: 14px;">
           <button class="btn btn-ghost" type="button" onclick="fecharModalRelatorio()">Cancelar</button>
+          <button class="btn btn-success" type="button" onclick="gerarRelatorio()">Gerar Relatório Completo</button>
         </div>
         <div id="resultadoRelatorio" style="margin-top: 18px; display: none;"></div>
       </div>
@@ -610,8 +613,11 @@
         
         <div class="form-group">
           <label for="ajusteObservacoes">Observações do Ajuste *</label>
-          <textarea id="ajusteObservacoes" rows="4" placeholder="Descreva as alterações necessárias..." required></textarea>
-          <small class="help">Obrigatório - Seja específico sobre o que precisa ser ajustado</small>
+          <textarea id="ajusteObservacoes" rows="4" maxlength="1000" placeholder="Descreva as alterações necessárias..." required></textarea>
+          <small class="help" id="helpAjusteObservacoes">
+            Obrigatório - Seja específico sobre o que precisa ser ajustado
+            <span class="char-counter"><span class="char-count">0</span>/1000 caracteres</span>
+          </small>
         </div>
         
         <div class="form-group">
@@ -627,11 +633,11 @@
           <small class="help">Obrigatório</small>
         </div>
         
-        <div class="btn-group" style="margin-top: 16px;">
+        <div class="btn-group justify-end" style="margin-top: 16px;">
+          <button class="btn btn-ghost" type="button" onclick="fecharModalAjuste()">Cancelar</button>
           <button class="btn btn-primary" type="button" onclick="confirmarSolicitarAjuste()">
             <i class="bi bi-check-circle"></i> Solicitar Ajuste
           </button>
-          <button class="btn btn-ghost" type="button" onclick="fecharModalAjuste()">Cancelar</button>
         </div>
       </div>
     </div>
@@ -639,7 +645,7 @@
 
   <!-- Modal Histórico de Versões -->
   <div id="modalHistorico" class="modal" role="dialog" aria-modal="true" aria-label="Histórico de versões">
-    <div class="modal-content" style="max-width: 900px;">
+    <div class="modal-content" style="max-width: 1100px;">
       <div class="modal-header">
         <h3 class="modal-title"><i class="bi bi-clock-history"></i> Histórico de Versões</h3>
         <button class="close-modal" type="button" onclick="fecharModalHistorico()">&times;</button>
@@ -682,24 +688,28 @@
           <textarea 
             id="motivoReprovacao" 
             rows="4" 
+            maxlength="1000"
             placeholder="Digite o motivo da reprovação..."
             style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); resize: vertical; font-family: inherit;"
           ></textarea>
+          <small class="help" id="helpMotivoReprovacao" style="display: block; margin-top: 4px; color: var(--muted); font-size: 0.85rem;">
+            <span class="char-counter"><span class="char-count">0</span>/1000 caracteres</span>
+          </small>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-danger" type="button" onclick="confirmarReprovacaoAjuste()">
-          <i class="bi bi-x-circle"></i> Reprovar
-        </button>
         <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmarReprovacao()">
           <i class="bi bi-x"></i> Cancelar
+        </button>
+        <button class="btn btn-danger" type="button" onclick="confirmarReprovacaoAjuste()">
+          <i class="bi bi-x-circle"></i> Reprovar
         </button>
       </div>
     </div>
   </div>
 
   <footer class="app-footer">
-    Versão: V2.2.2 • © Desenvolvido por Seteg - Soluções Geológicas e Ambientais • 2026
+    Versão: V2.2.5 • © Desenvolvido por Seteg - Soluções Geológicas e Ambientais • 2026
   </footer>
 
   <!-- Loader Global -->

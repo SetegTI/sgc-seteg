@@ -4,9 +4,9 @@
  * Empresa: SETEG
  */
 
-// Integração do Versionamento
+// Integração do sistema de versionamento com a interface
 
-// Abre modal para solicitar ajuste
+// Modal para solicitar ajuste
 window.abrirModalAjuste = function(idSolicitacao) {
   const modal = document.getElementById("modalAjuste");
   const idInput = document.getElementById("ajusteIdSolicitacao");
@@ -15,19 +15,22 @@ window.abrirModalAjuste = function(idSolicitacao) {
     idInput.value = idSolicitacao;
     modal.classList.add("active");
     
-    // Aplicar máscara de data
+    // Aplicar máscara de data e inicializar seletor
     setTimeout(() => {
       const prazoInput = document.getElementById("ajustePrazoFinal");
       if (prazoInput && window.aplicarMascaraData) {
         window.aplicarMascaraData(prazoInput);
       }
+      
+      // Inicializar seletor de data para o campo do modal
+      if (window.inicializarSeletoresData) {
+        window.inicializarSeletoresData();
+      }
     }, 100);
   }
 };
 
-/**
- * Fecha modal de ajuste
- */
+// Fechar modal de ajuste
 window.fecharModalAjuste = function() {
   const modal = document.getElementById("modalAjuste");
   if (modal) {
@@ -40,12 +43,15 @@ window.fecharModalAjuste = function() {
     document.getElementById("ajusteTipoAjuste").value = "";
     document.getElementById("ajusteObservacoes").value = "";
     document.getElementById("ajustePrazoFinal").value = "";
+    
+    // Resetar textarea de observações usando a função auxiliar do app.js
+    if (window.resetarTextareaContador) {
+      window.resetarTextareaContador("ajusteObservacoes", "helpAjusteObservacoes");
+    }
   }
 };
 
-/**
- * Confirma e envia solicitação de ajuste
- */
+// Confirmar e enviar solicitação de ajuste
 window.confirmarSolicitarAjuste = async function() {
   // Proteção contra cliques duplos
   if (window.confirmarSolicitarAjuste.processando) {
@@ -137,9 +143,7 @@ window.confirmarSolicitarAjuste = async function() {
   }
 };
 
-/**
- * Abre modal com histórico de versões
- */
+// Abrir modal com histórico de versões
 window.abrirModalHistorico = async function(idSolicitacao) {
   const modal = document.getElementById("modalHistorico");
   const conteudo = document.getElementById("conteudoHistorico");
@@ -227,10 +231,6 @@ window.abrirModalHistorico = async function(idSolicitacao) {
           `).join('')}
         </div>
         ` : ''}
-
-        <h4 style="margin-bottom: 16px; color: var(--text); font-size: 1.1rem;">
-          <i class="bi bi-clock-history"></i> Histórico de Versões (${historico.versoes.length})
-        </h4>
         
         <div class="versao-timeline">
     `;
@@ -332,7 +332,7 @@ window.abrirModalHistorico = async function(idSolicitacao) {
         </div>
       </div>
       
-      <div class="btn-group" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+      <div class="btn-group justify-end" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
         <button class="btn btn-ghost" type="button" onclick="fecharModalHistorico()">
           <i class="bi bi-x-circle"></i> Fechar
         </button>
@@ -355,9 +355,7 @@ window.abrirModalHistorico = async function(idSolicitacao) {
   }
 };
 
-/**
- * Gera botões de ações para uma versão
- */
+// Gerar botões de ações para uma versão
 function gerarBotoesAcoesVersao(idSolicitacao, versao) {
   if (!window.acessoGestor && !window.acessoTecnico) {
     return '';
@@ -399,9 +397,7 @@ function gerarBotoesAcoesVersao(idSolicitacao, versao) {
   return html;
 }
 
-/**
- * Fecha modal de histórico
- */
+// Fechar modal de histórico
 window.fecharModalHistorico = function() {
   const modal = document.getElementById("modalHistorico");
   if (modal) {
@@ -409,9 +405,7 @@ window.fecharModalHistorico = function() {
   }
 };
 
-/**
- * Aprova um ajuste pendente (chamado do modal de histórico)
- */
+// Aprovar ajuste pendente (chamado do modal de histórico)
 window.aprovarAjustePendenteModal = async function(idSolicitacao, idAjuste) {
   if (!window.acessoGestor) {
     mostrarNotificacao("Apenas gestores podem aprovar ajustes!", "warning");
@@ -422,9 +416,7 @@ window.aprovarAjustePendenteModal = async function(idSolicitacao, idAjuste) {
   window.abrirModalAtribuicaoAjuste(idSolicitacao, idAjuste);
 };
 
-/**
- * Abre modal para atribuir técnico ao aprovar ajuste
- */
+// Abrir modal para atribuir técnico ao aprovar ajuste
 window.abrirModalAtribuicaoAjuste = function(idSolicitacao, idAjuste) {
   const modal = document.getElementById("modalAtribuicao");
   const conteudo = document.getElementById("conteudoAtribuicao");
@@ -461,9 +453,7 @@ window.abrirModalAtribuicaoAjuste = function(idSolicitacao, idAjuste) {
   modal.classList.add("active");
 };
 
-/**
- * Confirma aprovação do ajuste pendente
- */
+// Confirmar aprovação do ajuste pendente
 window.confirmarAprovarAjuste = async function(idSolicitacao, idAjuste) {
   const tecnico = document.getElementById("selectTecnicoAjuste")?.value;
 
@@ -500,9 +490,7 @@ window.confirmarAprovarAjuste = async function(idSolicitacao, idAjuste) {
   }
 };
 
-/**
- * Reprova um ajuste pendente
- */
+// Reprovar ajuste pendente
 window.reprovarAjustePendenteModal = async function(idSolicitacao, idAjuste) {
   if (!window.acessoGestor) {
     mostrarNotificacao("Apenas gestores podem reprovar ajustes!", "warning");
@@ -534,9 +522,7 @@ window.reprovarAjustePendenteModal = async function(idSolicitacao, idAjuste) {
   }
 };
 
-/**
- * Aprova uma versão (chamado do modal de histórico)
- */
+// Aprovar versão (chamado do modal de histórico)
 window.aprovarVersaoModal = async function(idSolicitacao, versao) {
   if (!window.acessoGestor) {
     mostrarNotificacao("Apenas gestores podem aprovar ajustes!", "warning");
@@ -547,9 +533,7 @@ window.aprovarVersaoModal = async function(idSolicitacao, versao) {
   window.abrirModalAtribuicaoVersao(idSolicitacao, versao);
 };
 
-/**
- * Abre modal para atribuir técnico ao aprovar versão
- */
+// Abrir modal para atribuir técnico ao aprovar versão
 window.abrirModalAtribuicaoVersao = function(idSolicitacao, versao) {
   const modal = document.getElementById("modalAtribuicao");
   const conteudo = document.getElementById("conteudoAtribuicao");
@@ -585,9 +569,7 @@ window.abrirModalAtribuicaoVersao = function(idSolicitacao, versao) {
   modal.classList.add("active");
 };
 
-/**
- * Confirma aprovação da versão
- */
+// Confirmar aprovação da versão
 window.confirmarAprovarVersao = async function(idSolicitacao, versao) {
   const tecnico = document.getElementById("selectTecnicoVersao")?.value;
 
@@ -619,9 +601,7 @@ window.confirmarAprovarVersao = async function(idSolicitacao, versao) {
   }
 };
 
-/**
- * Reprova uma versão
- */
+// Reprovar versão
 window.reprovarVersaoModal = async function(idSolicitacao, versao) {
   if (!window.acessoGestor) {
     mostrarNotificacao("Apenas gestores podem reprovar ajustes!", "warning");
@@ -653,9 +633,7 @@ window.reprovarVersaoModal = async function(idSolicitacao, versao) {
   }
 };
 
-/**
- * Inicia uma versão
- */
+// Iniciar versão
 window.iniciarVersaoModal = async function(idSolicitacao, versao) {
   try {
     await window.versioningModule.iniciarAjuste(idSolicitacao, versao);
@@ -670,9 +648,7 @@ window.iniciarVersaoModal = async function(idSolicitacao, versao) {
   }
 };
 
-/**
- * Finaliza uma versão
- */
+// Finalizar versão
 window.finalizarVersaoModal = async function(idSolicitacao, versao) {
   if (!confirm(`Confirma a finalização da versão ${versao}?`)) {
     return;
@@ -691,7 +667,4 @@ window.finalizarVersaoModal = async function(idSolicitacao, versao) {
   }
 };
 
-// Aguardar o DOM estar pronto
-document.addEventListener("DOMContentLoaded", () => {
-  // Módulo carregado
-});
+// Módulo carregado

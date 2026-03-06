@@ -4,7 +4,7 @@
  * Empresa: SETEG
  */
 
-/* Tema e Variáveis */
+/* Variáveis de tema */
 :root {
   --bg: #050816;
   --bg-elevated: rgba(15, 23, 42, 0.92);
@@ -29,7 +29,7 @@
   --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.85);
 }
 
-/* TEMA LIGHT */
+/* Tema light */
 [data-theme="light"] {
   --bg: #ffffff;
   --bg-elevated: rgba(255, 255, 255, 0.98);
@@ -191,7 +191,7 @@ body {
   align-items: center;
 }
 
-/* TOGGLE THEME */
+/* Toggle de tema */
 .theme-toggle {
   position: relative;
   width: 60px;
@@ -537,28 +537,70 @@ textarea {
   resize: vertical;
 }
 
+/* Feedback visual quando atingir limite de caracteres */
+textarea.limite-atingido {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+  animation: shake 0.3s ease-in-out;
+}
+
+[data-theme="light"] textarea.limite-atingido {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.help.limite-atingido {
+  color: #ef4444 !important;
+  font-weight: 600;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.char-counter {
+  display: inline-block;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.help.limite-atingido .char-counter {
+  color: #ef4444;
+}
+
 /* Input de data - ÍCONE CUSTOMIZADO */
 .date-input-wrapper {
   position: relative;
   width: 100%;
+  display: block;
 }
 
-.date-input-wrapper input[type="date"] {
+.date-input-wrapper input[type="text"] {
   width: 100%;
   padding-right: 40px;
-  cursor: pointer;
-  color: var(--text);
 }
 
-/* Esconder o ícone nativo mas manter a funcionalidade */
+/* Input nativo oculto - criado dinamicamente pelo JS */
+.date-input-wrapper input[type="date"] {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: auto !important;
+  z-index: 1 !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  cursor: pointer !important;
+}
+
+/* Esconder completamente o ícone nativo do input date */
 .date-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  position: absolute;
-  right: 0;
-  width: 40px;
-  height: 100%;
-  cursor: pointer;
-  z-index: 2;
+  display: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.date-input-wrapper input[type="date"]::-webkit-inner-spin-button,
+.date-input-wrapper input[type="date"]::-webkit-clear-button {
+  display: none !important;
 }
 
 /* Ícone customizado */
@@ -567,11 +609,13 @@ textarea {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  pointer-events: none;
+  pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1;
+  z-index: 2;
+  cursor: pointer;
+  padding: 4px;
 }
 
 .calendar-icon svg {
@@ -579,11 +623,20 @@ textarea {
   height: 18px;
   fill: #e5e7eb;
   transition: fill 0.2s ease;
+  pointer-events: none;
+}
+
+.calendar-icon:hover svg {
+  fill: #2563eb;
 }
 
 /* Tema Light */
 [data-theme="light"] .calendar-icon svg {
   fill: #ff8200;
+}
+
+[data-theme="light"] .calendar-icon:hover svg {
+  fill: #cc6900;
 }
 
 /* REMOVER efeitos de hover/focus dos inputs de data */
@@ -1036,6 +1089,14 @@ textarea:focus {
   gap: 8px;
 }
 
+.btn-group.justify-end {
+  justify-content: flex-end;
+}
+
+.btn-group.reverse {
+  flex-direction: row-reverse;
+}
+
 
 .tabs {
   display: inline-flex;
@@ -1197,12 +1258,26 @@ tbody tr:hover {
 }
 
 [data-theme="light"] .stats-card {
-  background: white;
+  background: #ffffff !important;
   border-color: rgba(226, 232, 240, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 [data-theme="light"] .stats-card:hover {
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 8px 20px rgba(255, 130, 0, 0.15);
+  border-color: rgba(255, 130, 0, 0.3);
+}
+
+[data-theme="light"] .stats-label {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .stats-number {
+  background: linear-gradient(135deg, #ff8200, #e67300) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
 }
 
 .stats-label {
@@ -1218,6 +1293,7 @@ tbody tr:hover {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  color: transparent;
 }
 
 .legend-card {
@@ -1467,6 +1543,15 @@ tbody tr:hover {
   font-size: 0.9rem;
 }
 
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
 .close-modal {
   border: none;
   background: transparent;
@@ -1488,7 +1573,7 @@ tbody tr:hover {
   transform: rotate(90deg);
 }
 
-/* Seções de Detalhes */
+/* Detalhes */
 .detalhe-section {
   margin-bottom: 20px;
   padding: 16px;
@@ -1621,14 +1706,37 @@ tbody tr:hover {
   border: 1px solid rgba(31, 41, 55, 0.9);
 }
 
+[data-theme="light"] .relatorio-metric {
+  background: #ffffff !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
 .relatorio-metric-value {
   font-size: 1.1rem;
   font-weight: 700;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme="light"] .relatorio-metric-value {
+  background: linear-gradient(135deg, #ff8200, #e67300) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
 }
 
 .relatorio-metric-label {
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+[data-theme="light"] .relatorio-metric-label {
+  color: #64748b !important;
 }
 
 .tecnico-relatorio {
@@ -2007,14 +2115,14 @@ tbody tr:hover {
 /* Timeline de Versões */
 .versao-timeline {
   position: relative;
-  padding-left: 32px;
+  padding-left: 40px;
 }
 
 .versao-timeline::before {
   content: '';
   position: absolute;
-  left: 11px;
-  top: 12px;
+  left: 13px;
+  top: 18px;
   bottom: 24px;
   width: 2px;
   background: var(--border-subtle);
@@ -2028,10 +2136,10 @@ tbody tr:hover {
 .versao-timeline-item::before {
   content: '';
   position: absolute;
-  left: -25px;
+  left: -34px;
   top: 12px;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--primary);
   border: 2px solid var(--bg);
@@ -2039,9 +2147,9 @@ tbody tr:hover {
 }
 
 .versao-timeline-item.atual::before {
-  width: 16px;
-  height: 16px;
-  left: -27px;
+  width: 18px;
+  height: 18px;
+  left: -36px;
   top: 10px;
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
 }

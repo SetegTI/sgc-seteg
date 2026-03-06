@@ -10,6 +10,7 @@ let acessoGestor = false;
 let acessoTecnico = false;
 let tecnicoLogado = null;
 let currentTheme = 'dark';
+let filtroAtual = null; // Armazena o filtro atual selecionado
 
 // Restaurar login do localStorage
 function restaurarLogin() {
@@ -370,7 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.classList.add("active");
       
       // Filtros baseados no índice
-      const filtros = [null, "fila", "processando", "aguardando", "finalizado"];
+      const filtros = ['todas', "fila", "processando", "aguardando", "finalizado"];
       atualizarTabela(filtros[index]);
     });
   });
@@ -383,6 +384,12 @@ document.addEventListener("DOMContentLoaded", () => {
   aplicarMascaraData(document.getElementById("dataEntrega"));
   aplicarMascaraData(document.getElementById("relatorioPeriodoInicio"));
   aplicarMascaraData(document.getElementById("relatorioPeriodoFim"));
+  
+  // Inicializar seletores de data nativos
+  inicializarSeletoresData();
+  
+  // Validação de limite de caracteres em textareas
+  validarLimiteTextareas();
   
   // Fechar modais com ESC
   document.addEventListener('keydown', (e) => {
@@ -443,7 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     clearInterval(aguardarFirebase);
     if (!window.dbRef) {
-      console.error("Firebase: Falha ao inicializar");
+      mostrarNotificacao("Erro ao conectar com o banco de dados", "error");
     }
   }, 5000);
   
@@ -478,7 +485,7 @@ function carregarSolicitacoesFirebase() {
   const dbRef = window.dbRef;
 
   if (!dbRef || !onValue) {
-    console.error("Firebase: Não inicializado");
+    mostrarNotificacao("Erro ao carregar dados", "error");
     esconderLoader();
     return;
   }
@@ -507,7 +514,7 @@ function carregarSolicitacoesFirebase() {
         }
       });
     }
-    atualizarTabela();
+    atualizarTabela('todas');
     atualizarEstatisticas();
     atualizarListaTecnicos();
     atualizarEstatisticasTecnico();
@@ -554,14 +561,19 @@ function salvarSolicitacaoFirebase(dados) {
         limparForm();
         toggleForm();
       })
-      .catch((err) => {
-        console.error("Firebase: Erro ao salvar", err);
+      .catch(() => {
         mostrarNotificacao("Erro ao salvar solicitação!", "error");
+      })
+      .finally(() => {
+        // Liberar flag de processamento
+        salvarSolicitacao.processando = false;
+        esconderLoader();
       });
   })
-  .catch((err) => {
-    console.error("Firebase: Erro no contador", err);
-    mostrarNotificacao("Erro: Verifique as permissões do Firebase!", "error");
+  .catch(() => {
+    mostrarNotificacao("Erro ao criar solicitação!", "error");
+    salvarSolicitacao.processando = false;
+    esconderLoader();
   });
 }
 
@@ -587,8 +599,7 @@ function atualizarSolicitacaoFirebase(id, dados) {
         .then(() => {
           // Atualização bem-sucedida
         })
-        .catch((err) => {
-          console.error("Firebase: Erro ao atualizar", err);
+        .catch(() => {
           mostrarNotificacao("Erro ao atualizar!", "error");
         });
     }
@@ -612,8 +623,7 @@ function excluirSolicitacao(id) {
       fecharModal();
       mostrarNotificacao(`Solicitação #${id} excluída!`, "success");
     })
-    .catch((err) => {
-      console.error("Firebase: Erro ao excluir", err);
+    .catch(() => {
       mostrarNotificacao("Erro ao excluir!", "error");
     });
 }
@@ -640,6 +650,26 @@ function limparForm() {
   safeSetDisplay("tipoMapaOutros", "none");
   safeSetDisplay("artResponsavelContainer", "none");
   safeSetDisplay("campoElementosOutros", "none");
+  
+  // Resetar contadores e feedback visual dos textareas
+  const textareas = formSolicitacao?.querySelectorAll('textarea[maxlength]');
+  textareas?.forEach(textarea => {
+    // Remover classes de limite atingido
+    textarea.classList.remove('limite-atingido');
+    
+    // Resetar contador
+    const helpText = textarea.nextElementSibling || textarea.parentElement.querySelector('.help');
+    if (helpText) {
+      helpText.classList.remove('limite-atingido');
+      const charCounter = helpText.querySelector('.char-count');
+      if (charCounter) {
+        charCounter.textContent = '0';
+      }
+    }
+  });
+  
+  // Mostrar notificação
+  mostrarNotificacao("Formulário limpo com sucesso!", "success");
 }
 
 function toggleTipoMapaOutros() {
@@ -668,6 +698,12 @@ function toggleElementosOutros() {
 
 function salvarSolicitacao(e) {
   e.preventDefault();
+  
+  // Proteção contra duplo clique
+  if (salvarSolicitacao.processando) {
+    mostrarNotificacao("Aguarde, salvando solicitação...", "info");
+    return;
+  }
   
   if (!window.db || !window.firebaseFunctions) {
     mostrarNotificacao("Firebase não está pronto. Aguarde...", "warning");
@@ -723,6 +759,10 @@ function salvarSolicitacao(e) {
     }
   }
 
+  // Marcar como processando
+  salvarSolicitacao.processando = true;
+  mostrarLoader("Salvando solicitação...");
+
   const dados = {
     solicitante: formData.get("solicitante"),
     cliente: formData.get("cliente"),
@@ -776,6 +816,7 @@ function atualizarIndicadorLogin() {
   const btnTecnico = document.getElementById("btnAcessoTecnico");
   const cardNovaSolicitacao = document.getElementById("cardNovaSolicitacao");
   const notificacoesAjustes = document.getElementById("notificacoesAjustes");
+  const tituloSolicitacoes = document.getElementById("tituloSolicitacoes");
   
   if (acessoGestor) {
     indicator.style.display = "flex";
@@ -784,6 +825,7 @@ function atualizarIndicadorLogin() {
     btnTecnico.style.display = "none";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
     if (notificacoesAjustes) notificacoesAjustes.style.display = "block";
+    if (tituloSolicitacoes) tituloSolicitacoes.textContent = "Todas as Solicitações";
     
     // Atualizar contador de ajustes pendentes
     setTimeout(() => atualizarContadorAjustesPendentes(), 500);
@@ -794,12 +836,14 @@ function atualizarIndicadorLogin() {
     btnTecnico.style.display = "none";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
     if (notificacoesAjustes) notificacoesAjustes.style.display = "none";
+    if (tituloSolicitacoes) tituloSolicitacoes.textContent = "Minhas Solicitações";
   } else {
     indicator.style.display = "none";
     btnGestor.style.display = "inline-flex";
     btnTecnico.style.display = "inline-flex";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "block";
     if (notificacoesAjustes) notificacoesAjustes.style.display = "none";
+    if (tituloSolicitacoes) tituloSolicitacoes.textContent = "Todas as Solicitações";
   }
 }
 
@@ -848,7 +892,6 @@ async function verificarCodigoFirebase(codigoDigitado) {
     }
     
   } catch (error) {
-    console.error("Auth: Erro ao verificar acesso", error);
     mostrarNotificacao("Erro ao verificar acesso. Tente novamente.", "error");
     return null;
   }
@@ -972,14 +1015,20 @@ function fazerLogout() {
 function atualizarTabela(filtroStatus = null) {
   if (!tabelaSolicitacoes) return;
 
+  // Armazenar o filtro atual
+  if (filtroStatus !== undefined) {
+    filtroAtual = filtroStatus;
+  }
+
   let base = solicitacoes;
 
   if (acessoTecnico && tecnicoLogado && !acessoGestor) {
     base = base.filter((s) => s.tecnicoResponsavel === tecnicoLogado);
   }
 
-  if (filtroStatus) {
-    base = base.filter((s) => s.status === filtroStatus);
+  // Filtrar por status apenas se não for 'todas' ou null
+  if (filtroAtual && filtroAtual !== 'todas') {
+    base = base.filter((s) => s.status === filtroAtual);
   }
 
   if (base.length === 0) {
@@ -1030,7 +1079,6 @@ function verDetalhes(id) {
   }
   
   if (!conteudoDetalhes) {
-    console.error("Elemento conteudoDetalhes não encontrado");
     return;
   }
 
@@ -1134,17 +1182,19 @@ function verDetalhes(id) {
               </select>
               <i class="bi bi-chevron-down" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: rgba(59, 130, 246, 0.8); font-size: 1.2rem;"></i>
             </div>
-            <button class="btn btn-success" type="button" onclick="salvarNovoStatus(${solicitacao.id})" style="margin-top: 12px; width: 100%;">
-              <i class="bi bi-check-circle"></i> Salvar Alterações
-            </button>
           </div>
         </div>
-        <div class="btn-group" style="margin-top: 12px; gap: 8px;">
+        <div class="btn-group justify-end" style="margin-top: 12px; gap: 8px;">
+          <button class="btn btn-danger" type="button" onclick="confirmarExclusao(${Number(solicitacao.id)})">
+            <i class="bi bi-trash"></i> Excluir Solicitação
+          </button>
           <button class="btn btn-info" type="button" onclick="abrirModalAtribuicao(${Number(solicitacao.id)})">
             <i class="bi bi-person-plus"></i> Atribuir Técnico
           </button>
-          <button class="btn btn-danger" type="button" onclick="confirmarExclusao(${Number(solicitacao.id)})">
-            <i class="bi bi-trash"></i> Excluir Solicitação
+          <button class="btn btn-success" type="button" onclick="salvarNovoStatus(${solicitacao.id})">
+            <i class="bi bi-check-circle"></i> Salvar Alterações
+          </button>
+        </div>
           </button>
         </div>
       </div>
@@ -1380,7 +1430,6 @@ function salvarNovoStatus(id) {
   const select = document.getElementById(`selectEstagio${id}`);
   
   if (!select) {
-    console.error("Select não encontrado para ID:", id);
     return;
   }
   
@@ -1454,7 +1503,7 @@ function abrirModalAtribuicao(id) {
       <input type="text" id="inputDataConclusao" placeholder="DD/MM/AAAA" maxlength="10" />
     </div>
 
-    <div class="btn-group" style="margin-top: 16px;">
+    <div class="btn-group justify-end" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalAtribuicao()">Cancelar</button>
       <button class="btn btn-primary" type="button" onclick="atribuirTecnico(${Number(
         id
@@ -1502,6 +1551,40 @@ function atribuirTecnico(id) {
     return;
   }
   
+  // Validar data se fornecida
+  if (dataConclusaoBR && dataConclusaoBR.length > 0) {
+    if (dataConclusaoBR.length !== 10) {
+      mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
+      return;
+    }
+    
+    const partes = dataConclusaoBR.split('/');
+    if (partes.length !== 3) {
+      mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
+      return;
+    }
+    
+    const dia = parseInt(partes[0]);
+    const mes = parseInt(partes[1]);
+    const ano = parseInt(partes[2]);
+    
+    // Validação básica de ranges
+    if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2100) {
+      mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
+      return;
+    }
+    
+    // Validação se a data realmente existe (ex: 31/02 não existe)
+    const dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    const dataObj = new Date(dataISO + 'T00:00:00');
+    
+    // Verificar se a data é válida comparando os valores
+    if (dataObj.getDate() !== dia || dataObj.getMonth() + 1 !== mes || dataObj.getFullYear() !== ano) {
+      mostrarNotificacao("Data inválida! Esta data não existe no calendário.", "warning");
+      return;
+    }
+  }
+  
   // Converter data BR para ISO se fornecida
   const dataConclusao = dataConclusaoBR ? converterDataParaISO(dataConclusaoBR) : null;
 
@@ -1537,11 +1620,11 @@ function confirmarExclusao(id) {
     <p style="margin-top: 8px; color: var(--warning);">
       Esta ação NÃO pode ser desfeita!
     </p>
-    <div class="btn-group" style="margin-top: 16px;">
+    <div class="btn-group justify-end" style="margin-top: 16px;">
+      <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
       <button class="btn btn-danger" type="button" onclick="excluirSolicitacao(${Number(
         id
       )})">Excluir</button>
-      <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
     </div>
   `;
 
@@ -2036,6 +2119,13 @@ window.toggleTipoMapaOutros = toggleTipoMapaOutros;
 window.toggleARTResponsavel = toggleARTResponsavel;
 window.toggleElementosOutros = toggleElementosOutros;
 
+window.resetarTextareaContador = resetarTextareaContador;
+window.abrirSeletorData = abrirSeletorData;
+window.inicializarSeletoresData = inicializarSeletoresData;
+window.aplicarMascaraData = aplicarMascaraData;
+window.converterDataParaISO = converterDataParaISO;
+window.converterDataParaBR = converterDataParaBR;
+
 window.abrirModalAcessoGestor = abrirModalAcessoGestor;
 window.fecharModalAcessoGestor = fecharModalAcessoGestor;
 window.validarCodigoAcesso = validarCodigoAcesso;
@@ -2138,9 +2228,20 @@ function aplicarMascaraData(input) {
         const mes = parseInt(partes[1]);
         const ano = parseInt(partes[2]);
         
-        // Validação básica
+        // Validação básica de ranges
         if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2100) {
           mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
+          e.target.value = '';
+          return;
+        }
+        
+        // Validação se a data realmente existe (ex: 31/02 não existe)
+        const dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        const dataObj = new Date(dataISO + 'T00:00:00');
+        
+        // Verificar se a data é válida comparando os valores
+        if (dataObj.getDate() !== dia || dataObj.getMonth() + 1 !== mes || dataObj.getFullYear() !== ano) {
+          mostrarNotificacao("Data inválida! Esta data não existe no calendário.", "warning");
           e.target.value = '';
         }
       }
@@ -2162,6 +2263,193 @@ function converterDataParaBR(dataISO) {
   const partes = dataISO.split('-');
   if (partes.length !== 3) return '';
   return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+// Abrir seletor de data nativo do navegador
+function abrirSeletorData(inputTextoId, inputNativoId) {
+  const inputNativo = document.getElementById(inputNativoId);
+  const inputTexto = document.getElementById(inputTextoId);
+  
+  if (!inputNativo || !inputTexto) {
+    return;
+  }
+  
+  // Converter data atual do campo texto para ISO (se houver)
+  if (inputTexto.value && inputTexto.value.length === 10) {
+    const dataISO = converterDataParaISO(inputTexto.value);
+    if (dataISO) {
+      inputNativo.value = dataISO;
+    }
+  }
+  
+  // Tentar usar showPicker se disponível
+  try {
+    if (typeof inputNativo.showPicker === 'function') {
+      inputNativo.showPicker();
+    } else {
+      // Fallback: focar no input
+      inputNativo.focus();
+      inputNativo.click();
+    }
+  } catch (e) {
+    // Fallback: focar no input
+    inputNativo.focus();
+    inputNativo.click();
+  }
+}
+
+// Inicializar seletores de data em todos os campos
+function inicializarSeletoresData() {
+  const campos = [
+    { texto: 'dataSolicitacao', nativo: 'dataSolicitacaoNativo' },
+    { texto: 'dataEntrega', nativo: 'dataEntregaNativo' },
+    { texto: 'relatorioPeriodoInicio', nativo: 'relatorioPeriodoInicioNativo' },
+    { texto: 'relatorioPeriodoFim', nativo: 'relatorioPeriodoFimNativo' },
+    { texto: 'ajustePrazoFinal', nativo: 'ajustePrazoFinalNativo' }
+  ];
+  
+  campos.forEach(campo => {
+    const inputTexto = document.getElementById(campo.texto);
+    if (!inputTexto) return;
+    
+    const wrapper = inputTexto.parentElement;
+    if (!wrapper || !wrapper.classList.contains('date-input-wrapper')) return;
+    
+    // Verificar se já existe o input nativo
+    let inputNativo = document.getElementById(campo.nativo);
+    
+    if (!inputNativo) {
+      // Criar input nativo oculto
+      inputNativo = document.createElement('input');
+      inputNativo.type = 'date';
+      inputNativo.id = campo.nativo;
+      inputNativo.setAttribute('tabindex', '-1');
+      inputNativo.setAttribute('aria-hidden', 'true');
+      
+      wrapper.appendChild(inputNativo);
+      
+      // Quando selecionar uma data no input nativo
+      inputNativo.addEventListener('change', function() {
+        if (inputNativo.value) {
+          inputTexto.value = converterDataParaBR(inputNativo.value);
+          inputTexto.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+    }
+    
+    // Tornar o ícone clicável
+    const icone = wrapper.querySelector('.calendar-icon');
+    if (icone) {
+      // Remover listeners antigos clonando o elemento
+      const novoIcone = icone.cloneNode(true);
+      icone.parentNode.replaceChild(novoIcone, icone);
+      
+      // Adicionar novo listener
+      novoIcone.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        abrirSeletorData(campo.texto, campo.nativo);
+      });
+    }
+  });
+}
+
+// Resetar contador e feedback visual de um textarea
+function resetarTextareaContador(textareaId, helpTextId = null) {
+  const textarea = document.getElementById(textareaId);
+  if (textarea) {
+    textarea.value = "";
+    textarea.classList.remove('limite-atingido');
+    
+    // Tentar encontrar o help text
+    let helpText = helpTextId ? document.getElementById(helpTextId) : null;
+    if (!helpText) {
+      helpText = textarea.nextElementSibling;
+      if (helpText && !helpText.classList.contains('help')) {
+        helpText = textarea.parentElement.querySelector('.help');
+      }
+    }
+    
+    if (helpText) {
+      helpText.classList.remove('limite-atingido');
+      const charCounter = helpText.querySelector('.char-count');
+      if (charCounter) {
+        charCounter.textContent = '0';
+      }
+    }
+  }
+}
+
+// Validar limite de caracteres em textareas
+function validarLimiteTextareas() {
+  const textareas = document.querySelectorAll('textarea[maxlength]');
+  
+  textareas.forEach(textarea => {
+    const maxLength = parseInt(textarea.getAttribute('maxlength'));
+    
+    // Encontrar o elemento de ajuda (help text) associado
+    let helpText = textarea.nextElementSibling;
+    if (helpText && !helpText.classList.contains('help')) {
+      helpText = textarea.parentElement.querySelector('.help');
+    }
+    
+    // Encontrar o contador de caracteres
+    const charCounter = helpText?.querySelector('.char-count');
+    
+    // Função para verificar e aplicar feedback visual
+    const verificarLimite = () => {
+      const currentLength = textarea.value.length;
+      const atingiuLimite = currentLength >= maxLength;
+      
+      // Atualizar contador
+      if (charCounter) {
+        charCounter.textContent = currentLength;
+      }
+      
+      // Aplicar feedback visual
+      if (atingiuLimite) {
+        textarea.classList.add('limite-atingido');
+        if (helpText) {
+          helpText.classList.add('limite-atingido');
+        }
+      } else {
+        textarea.classList.remove('limite-atingido');
+        if (helpText) {
+          helpText.classList.remove('limite-atingido');
+        }
+      }
+    };
+    
+    // Validar ao colar
+    textarea.addEventListener('paste', function(e) {
+      setTimeout(() => {
+        if (this.value.length > maxLength) {
+          this.value = this.value.substring(0, maxLength);
+          mostrarNotificacao('TEXTO MUITO GRANDE, LIMITE DE 1000 CARACTERES', 'warning');
+        }
+        verificarLimite();
+      }, 10);
+    });
+    
+    // Validar ao digitar
+    textarea.addEventListener('input', function() {
+      if (this.value.length > maxLength) {
+        this.value = this.value.substring(0, maxLength);
+        mostrarNotificacao('TEXTO MUITO GRANDE, LIMITE DE 1000 CARACTERES', 'warning');
+      }
+      verificarLimite();
+    });
+    
+    // Remover feedback visual ao começar a apagar
+    textarea.addEventListener('keydown', function(e) {
+      if ((e.key === 'Backspace' || e.key === 'Delete') && this.value.length >= maxLength) {
+        setTimeout(() => verificarLimite(), 10);
+      }
+    });
+    
+    // Verificar limite inicial (caso já tenha conteúdo)
+    verificarLimite();
+  });
 }
 
 
@@ -2199,7 +2487,7 @@ async function atualizarContadorAjustesPendentes() {
       }
     }
   } catch (error) {
-    console.error("Erro ao atualizar contador de ajustes:", error);
+    // Silencioso - não precisa notificar o usuário
   }
 }
 
@@ -2248,7 +2536,7 @@ async function abrirModalAjustesPendentes() {
           <p class="ajustes-empty-text">Nenhum ajuste pendente</p>
           <p class="ajustes-empty-subtext">Todos os ajustes foram processados</p>
         </div>
-        <div class="btn-group" style="margin-top: 24px;">
+        <div class="btn-group justify-end" style="margin-top: 24px;">
           <button class="btn btn-ghost" type="button" onclick="fecharModalAjustesPendentes()">
             <i class="bi bi-x-circle"></i> Fechar
           </button>
@@ -2354,7 +2642,7 @@ async function abrirModalAjustesPendentes() {
     });
 
     html += `
-      <div class="btn-group" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+      <div class="btn-group justify-end" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
         <button class="btn btn-ghost" type="button" onclick="fecharModalAjustesPendentes()">
           <i class="bi bi-x-circle"></i> Fechar
         </button>
@@ -2363,7 +2651,6 @@ async function abrirModalAjustesPendentes() {
 
     conteudo.innerHTML = html;
   } catch (error) {
-    console.error("Erro ao carregar ajustes pendentes:", error);
     conteudo.innerHTML = `
       <div style="text-align: center; padding: 40px;">
         <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: var(--danger);"></i>
@@ -2377,9 +2664,7 @@ async function abrirModalAjustesPendentes() {
   }
 }
 
-/**
- * Fecha modal de ajustes pendentes
- */
+// Fechar modal de ajustes pendentes
 function fecharModalAjustesPendentes() {
   const modal = document.getElementById("modalAjustesPendentes");
   if (modal) {
@@ -2387,17 +2672,13 @@ function fecharModalAjustesPendentes() {
   }
 }
 
-/**
- * Ver detalhes da solicitação (fecha modal de ajustes e abre detalhes)
- */
+// Ver detalhes da solicitação
 function verDetalhesSolicitacao(idSolicitacao) {
   fecharModalAjustesPendentes();
   setTimeout(() => verDetalhes(idSolicitacao), 300);
 }
 
-/**
- * Aprovar ajuste do modal de notificações
- */
+// Aprovar ajuste do modal de notificações
 async function aprovarAjusteModal(idSolicitacao, idAjuste) {
   if (!acessoGestor) {
     mostrarNotificacao("Apenas gestores podem aprovar ajustes!", "warning");
@@ -2413,9 +2694,7 @@ async function aprovarAjusteModal(idSolicitacao, idAjuste) {
   }, 300);
 }
 
-/**
- * Reprovar ajuste do modal de notificações
- */
+// Reprovar ajuste do modal de notificações
 let ajusteParaReprovar = null;
 
 async function reprovarAjusteModal(idSolicitacao, idAjuste) {
@@ -2443,6 +2722,9 @@ function fecharModalConfirmarReprovacao() {
   const modal = document.getElementById("modalConfirmarReprovacao");
   if (modal) modal.style.display = "none";
   ajusteParaReprovar = null;
+  
+  // Resetar textarea de motivo
+  resetarTextareaContador("motivoReprovacao", "helpMotivoReprovacao");
 }
 
 async function confirmarReprovacaoAjuste() {
@@ -2495,9 +2777,7 @@ carregarSolicitacoesFirebase = function() {
 };
 
 
-/**
- * Abre modal customizado para confirmar reprovação
- */
+// Abrir modal customizado para confirmar reprovação
 function abrirModalConfirmacaoReprovar(idSolicitacao, idAjuste) {
   const modal = document.getElementById("modalConfirmacao");
   const conteudo = document.getElementById("conteudoConfirmacao");
@@ -2546,9 +2826,7 @@ function abrirModalConfirmacaoReprovar(idSolicitacao, idAjuste) {
   }, 100);
 }
 
-/**
- * Confirma a reprovação do ajuste
- */
+// Confirmar reprovação do ajuste
 async function confirmarReprovarAjuste(idSolicitacao, idAjuste) {
   const motivo = document.getElementById("motivoReprovacao")?.value.trim();
   

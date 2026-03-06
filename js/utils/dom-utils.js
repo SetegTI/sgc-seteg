@@ -1,3 +1,9 @@
+/**
+ * SGC SETEG - Sistema de Gestão Cartográfica
+ * Ano: 2026
+ * Empresa: SETEG
+ */
+
 export function qs(selector, root = document) {
   return root.querySelector(selector);
 }
