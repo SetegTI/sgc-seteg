@@ -1,14 +1,12 @@
-// SGC SETEG - Integração do Versionamento com o Sistema Existente
-// versioning-integration.js
-
-// =======================================================
-//  FUNÇÕES DE INTEGRAÇÃO
-// =======================================================
-
 /**
- * Abre modal para solicitar ajuste em uma solicitação
- * Disponível para todos os usuários (logados ou não)
+ * SGC SETEG - Sistema de Gestão Cartográfica
+ * Ano: 2026
+ * Empresa: SETEG
  */
+
+// Integração do Versionamento
+
+// Abre modal para solicitar ajuste
 window.abrirModalAjuste = function(idSolicitacao) {
   const modal = document.getElementById("modalAjuste");
   const idInput = document.getElementById("ajusteIdSolicitacao");

@@ -1,5 +1,8 @@
-﻿// SGC SETEG - Sistema de Gestão Cartográfica
-// app.js - Lógica principal da aplicação
+﻿/**
+ * SGC SETEG - Sistema de Gestão Cartográfica
+ * Ano: 2026
+ * Empresa: SETEG
+ */
 
 // Variáveis globais
 let solicitacoes = [];

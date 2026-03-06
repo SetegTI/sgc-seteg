@@ -1,10 +1,11 @@
-// SGC SETEG - Versionamento de Ajustes
-// Gerencia versões e ajustes das solicitações
+/**
+ * SGC SETEG - Sistema de Gestão Cartográfica
+ * Ano: 2026
+ * Empresa: SETEG
+ */
 
-// Estrutura no Firebase:
-// solicitacoes/{id}/versaoAtual, criadoPor, criadoEm
-// solicitacoes/{id}/versoes/{n}/ - dados de cada versão
-// solicitacoes/{id}/ajustesPendentes/{id}/ - ajustes aguardando aprovação
+// Versionamento de Ajustes
+// Gerencia versões e ajustes das solicitações
 
 // Criar solicitação inicial
 export async function criarSolicitacaoInicial(dados) {
