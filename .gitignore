@@ -1,31 +1,5 @@
-# Arquivos do sistema
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Backup
-*.bak
-*.backup
-*-backup/
-backup/
-
-# Node modules (caso adicione no futuro)
-node_modules/
-
-# Ambiente
+node_modules
+dist
 .env
-.env.local
-.env.*.local
+.vscode
+.DS_Store

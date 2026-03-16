@@ -4,23 +4,45 @@
  * Empresa: SETEG
  */
 
+import { supabase } from "./services/supabaseClient.js";
+import { autenticarUsuario } from "./modules/usuarios/usuariosService.js";
+import { registrarLog } from "./services/logService.js";
+import {
+  criarSolicitacao,
+  listarSolicitacoes,
+} from "./modules/solicitacoes/solicitacoesService.js";
+import {
+  solicitarAjuste,
+  aprovarAjustePendente,
+  reprovarAjustePendente,
+  obterAjustesPendentes,
+  obterHistoricoSolicitacao,
+  formatarStatusVersao,
+  obterClasseStatus,
+} from "./modules/ajustes/ajustesService.js";
+import {
+  abrirModalHistorico,
+  fecharModalHistorico,
+} from "./modules/ajustes/historicoModal.js";
+import { getStatusClass } from "./constants/status.js";
+
 // Variáveis globais
 let solicitacoes = [];
 let acessoGestor = false;
 let acessoTecnico = false;
 let tecnicoLogado = null;
-let currentTheme = 'dark';
+let currentTheme = "dark";
 let filtroAtual = null; // Armazena o filtro atual selecionado
 
 // Restaurar login do localStorage
 function restaurarLogin() {
-  const loginSalvo = localStorage.getItem('sgc_login');
+  const loginSalvo = localStorage.getItem("sgc_login");
   if (loginSalvo) {
     try {
       const dados = JSON.parse(loginSalvo);
-      if (dados.tipo === 'gestor') {
+      if (dados.tipo === "gestor") {
         acessoGestor = true;
-      } else if (dados.tipo === 'tecnico' && dados.tecnico) {
+      } else if (dados.tipo === "tecnico" && dados.tecnico) {
         acessoTecnico = true;
         tecnicoLogado = dados.tecnico;
       }
@@ -35,13 +57,13 @@ function mostrarPaineisLogin() {
   if (acessoGestor) {
     const painelGestor = document.getElementById("painelGestor");
     if (painelGestor) painelGestor.style.display = "block";
-    
+
     const painelTecnico = document.getElementById("painelTecnico");
     if (painelTecnico) painelTecnico.style.display = "none";
   } else if (acessoTecnico && tecnicoLogado) {
     const painelTecnico = document.getElementById("painelTecnico");
     if (painelTecnico) painelTecnico.style.display = "block";
-    
+
     const painelGestor = document.getElementById("painelGestor");
     if (painelGestor) painelGestor.style.display = "none";
   }
@@ -51,12 +73,12 @@ function mostrarPaineisLogin() {
 function salvarLogin(tipo, tecnico = null) {
   const dados = { tipo };
   if (tecnico) dados.tecnico = tecnico;
-  localStorage.setItem('sgc_login', JSON.stringify(dados));
+  localStorage.setItem("sgc_login", JSON.stringify(dados));
 }
 
 // Limpar login do localStorage
 function limparLogin() {
-  localStorage.removeItem('sgc_login');
+  localStorage.removeItem("sgc_login");
 }
 
 // Referências DOM
@@ -96,18 +118,17 @@ function formatDateBR(dateStr) {
 
 function formatarStatus(status) {
   const map = {
-    // Status principais da solicitação
+    // Status válidos do sistema
     fila: "Na Fila",
-    processando: "Processando",
-    aguardando: "Aguardando Dados",
-    finalizado: "Finalizado",
-    // Status de versionamento
+    em_andamento: "Em Andamento",
+    ajustes_pendentes: "Ajustes Pendentes",
+    concluido: "Concluído",
+    // Status de versionamento (legado - manter para compatibilidade)
     criado: "Criado",
     solicitado: "Aguardando Gestor",
     atribuido: "Atribuído",
     reprovado: "Reprovado",
-    em_andamento: "Em Andamento",
-    aguardando_aprovacao: "Aguardando Aprovação"
+    aguardando_aprovacao: "Aguardando Aprovação",
   };
   return map[status] || status;
 }
@@ -123,7 +144,7 @@ function formatarTipoMapa(tipo, nomeOutro) {
 
 function formatarNomeTecnico(codigo) {
   if (!codigo) return "Não atribuído";
-  
+
   // Mapear códigos para nomes completos
   const nomes = {
     LAIS: "Laís Mendes",
@@ -133,7 +154,7 @@ function formatarNomeTecnico(codigo) {
     ISMAEL: "Ismael Alves",
     FERNANDO: "Fernando Sousa",
   };
-  
+
   return nomes[codigo] || codigo;
 }
 
@@ -152,15 +173,15 @@ function formatarFinalidade(finalidade) {
 function mostrarNotificacao(mensagem, tipo = "info") {
   const notif = document.createElement("div");
   notif.className = `notification ${tipo}`;
-  
+
   // Ícone baseado no tipo
   const icones = {
     success: '<i class="bi bi-check-circle-fill"></i>',
     error: '<i class="bi bi-x-circle-fill"></i>',
     warning: '<i class="bi bi-exclamation-triangle-fill"></i>',
-    info: '<i class="bi bi-info-circle-fill"></i>'
+    info: '<i class="bi bi-info-circle-fill"></i>',
   };
-  
+
   notif.innerHTML = `
     <div class="notification-content">
       <span class="notification-icon">${icones[tipo] || icones.info}</span>
@@ -170,7 +191,7 @@ function mostrarNotificacao(mensagem, tipo = "info") {
       </button>
     </div>
   `;
-  
+
   document.body.appendChild(notif);
 
   setTimeout(() => notif.classList.add("show"), 10);
@@ -220,38 +241,7 @@ function convertToCSV(data) {
         const v = obj[h] ?? "";
         return `"${String(v).replace(/"/g, '""')}"`;
       })
-      .join(",")
-  );
-
-  return [headers.join(","), ...rows].join("\n");
-}
-
-function downloadCSV(dataArray, filename) {
-  const csv = convertToCSV(dataArray);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-function convertToCSV(data) {
-  if (!data || data.length === 0) return "";
-  const headers = Object.keys(data[0]);
-
-  const rows = data.map((obj) =>
-    headers
-      .map((h) => {
-        const v = obj[h] ?? "";
-        return `"${String(v).replace(/"/g, '""')}"`;
-      })
-      .join(",")
+      .join(","),
   );
 
   return [headers.join(","), ...rows].join("\n");
@@ -300,12 +290,78 @@ function calcularDataConclusao(dataInicio, prazoDias) {
   return data.toISOString().split("T")[0];
 }
 
+// Fecha o modal visível no momento (usado pelo ESC e clique fora)
+function fecharModalVisivel() {
+  const modalHistorico = document.getElementById("modalHistorico");
+  const modalAjuste = document.getElementById("modalAjuste");
+  const modalAjustesPendentes = document.getElementById(
+    "modalAjustesPendentes",
+  );
+  const modalReprovacao = document.getElementById("modalConfirmarReprovacao");
+
+  if (modalHistorico?.classList.contains("active")) {
+    window.fecharModalHistorico();
+  } else if (modalAjuste?.classList.contains("active")) {
+    fecharModalAjuste();
+  } else if (modalAjustesPendentes?.style.display === "flex") {
+    fecharModalAjustesPendentes();
+  } else if (modalDetalhes?.classList.contains("active")) {
+    fecharModal();
+  } else if (modalAcessoGestor?.classList.contains("active")) {
+    fecharModalAcessoGestor();
+  } else if (modalAcessoTecnico?.classList.contains("active")) {
+    fecharModalAcessoTecnico();
+  } else if (modalAtribuicao?.classList.contains("active")) {
+    fecharModalAtribuicao();
+  } else if (modalConfirmacao?.classList.contains("active")) {
+    fecharModalConfirmacao();
+  } else if (modalReprovacao?.style.display === "flex") {
+    fecharModalConfirmarReprovacao();
+  } else if (modalRelatorio?.classList.contains("active")) {
+    fecharModalRelatorio();
+  }
+}
+
+// Confirma a ação do modal visível ao pressionar ENTER
+function confirmarModalVisivel(e) {
+  // Não disparar se o foco estiver em textarea ou select
+  if (["TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+
+  const modalAcessoGestorEl = document.getElementById("modalAcessoGestor");
+  const modalAcessoTecnicoEl = document.getElementById("modalAcessoTecnico");
+  const modalConfirmacaoEl = document.getElementById("modalConfirmacao");
+  const modalAtribuicaoEl = document.getElementById("modalAtribuicao");
+  const modalAjusteEl = document.getElementById("modalAjuste");
+  const modalReprovacao = document.getElementById("modalConfirmarReprovacao");
+
+  if (modalAcessoGestorEl?.classList.contains("active")) {
+    e.preventDefault();
+    validarCodigoAcesso();
+  } else if (modalAcessoTecnicoEl?.classList.contains("active")) {
+    e.preventDefault();
+    validarAcessoTecnico();
+  } else if (modalConfirmacaoEl?.classList.contains("active")) {
+    e.preventDefault();
+    modalConfirmacaoEl.querySelector(".btn-danger")?.click();
+  } else if (modalAtribuicaoEl?.classList.contains("active")) {
+    e.preventDefault();
+    const id = modalAtribuicaoEl.dataset.solicitacaoId;
+    if (id) atribuirTecnico(Number(id));
+  } else if (modalAjusteEl?.classList.contains("active")) {
+    e.preventDefault();
+    confirmarSolicitarAjuste();
+  } else if (modalReprovacao?.style.display === "flex") {
+    e.preventDefault();
+    confirmarReprovacaoAjuste();
+  }
+}
+
 // Inicialização
 document.addEventListener("DOMContentLoaded", () => {
   // Carregar tema salvo
-  currentTheme = localStorage.getItem('theme') || 'dark';
+  currentTheme = localStorage.getItem("theme") || "dark";
   applyTheme(currentTheme);
-  
+
   // Restaurar login salvo
   restaurarLogin();
 
@@ -335,125 +391,90 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Bind eventos
   formSolicitacao?.addEventListener("submit", salvarSolicitacao);
-  
+
   // Botão Nova Solicitação
   const btnToggleForm = document.getElementById("btnToggleForm");
   btnToggleForm?.addEventListener("click", toggleForm);
-  
+
   // Botão toggle theme
   const btnToggleTheme = document.querySelector(".theme-toggle");
   btnToggleTheme?.addEventListener("click", toggleTheme);
-  
+
   // Botões de acesso
   const btnAcessoGestor = document.getElementById("btnAcessoGestor");
   btnAcessoGestor?.addEventListener("click", abrirModalAcessoGestor);
-  
+
   const btnAcessoTecnico = document.getElementById("btnAcessoTecnico");
   btnAcessoTecnico?.addEventListener("click", abrirModalAcessoTecnico);
-  
+
   // Botão Limpar Formulário
   const btnLimparForm = document.getElementById("btnLimparForm");
   btnLimparForm?.addEventListener("click", limparForm);
-  
+
   // Event listeners para campos condicionais
   const tipoMapaSelect = document.getElementById("tipoMapa");
   tipoMapaSelect?.addEventListener("change", toggleTipoMapaOutros);
-  
-  const artNecessariaRadios = document.querySelectorAll('input[name="artNecessaria"]');
-  artNecessariaRadios.forEach(radio => {
+
+  const artNecessariaRadios = document.querySelectorAll(
+    'input[name="artNecessaria"]',
+  );
+  artNecessariaRadios.forEach((radio) => {
     radio.addEventListener("change", toggleARTResponsavel);
   });
-  
+
   // Tabs de filtro
   tabBtns.forEach((btn, index) => {
     btn.addEventListener("click", () => {
-      tabBtns.forEach(b => b.classList.remove("active"));
+      tabBtns.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      
+
       // Filtros baseados no índice
-      const filtros = ['todas', "fila", "processando", "aguardando", "finalizado"];
+      const filtros = [
+        "todas",
+        "fila",
+        "em_andamento",
+        "ajustes_pendentes",
+        "concluido",
+      ];
       atualizarTabela(filtros[index]);
     });
   });
 
   bindEnterNoModal(modalAcessoGestor, validarCodigoAcesso);
   bindEnterNoModal(modalAcessoTecnico, validarAcessoTecnico);
-  
+
   // Aplicar máscaras de data
   aplicarMascaraData(document.getElementById("dataSolicitacao"));
   aplicarMascaraData(document.getElementById("dataEntrega"));
   aplicarMascaraData(document.getElementById("relatorioPeriodoInicio"));
   aplicarMascaraData(document.getElementById("relatorioPeriodoFim"));
-  
+
   // Inicializar seletores de data nativos
   inicializarSeletoresData();
-  
+
   // Validação de limite de caracteres em textareas
   validarLimiteTextareas();
-  
-  // Fechar modais com ESC
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      // Fechar modal de histórico
-      const modalHistorico = document.getElementById('modalHistorico');
-      if (modalHistorico?.classList.contains('active')) {
-        window.fecharModalHistorico();
-      }
-      // Fechar modal de ajuste
-      else if (document.getElementById('modalAjuste')?.classList.contains('active')) {
-        window.fecharModalAjuste();
-      }
-      // Fechar modal de ajustes pendentes
-      else if (document.getElementById('modalAjustesPendentes')?.style.display === 'flex') {
-        fecharModalAjustesPendentes();
-      }
-      // Fechar modal de detalhes
-      else if (modalDetalhes?.classList.contains('active')) {
-        fecharModal();
-      }
-      // Fechar modal de acesso gestor
-      else if (modalAcessoGestor?.classList.contains('active')) {
-        fecharModalAcessoGestor();
-      }
-      // Fechar modal de acesso técnico
-      else if (modalAcessoTecnico?.classList.contains('active')) {
-        fecharModalAcessoTecnico();
-      }
-      // Fechar modal de atribuição
-      else if (modalAtribuicao?.classList.contains('active')) {
-        fecharModalAtribuicao();
-      }
-      // Fechar modal de confirmação
-      else if (modalConfirmacao?.classList.contains('active')) {
-        fecharModalConfirmacao();
-      }
-      // Fechar modal de confirmação de reprovação
-      else if (document.getElementById('modalConfirmarReprovacao')?.style.display === 'flex') {
-        fecharModalConfirmarReprovacao();
-      }
-      // Fechar modal de relatório
-      else if (modalRelatorio?.classList.contains('active')) {
-        fecharModalRelatorio();
-      }
+
+  // Fechar modais com ESC e clique fora
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      fecharModalVisivel();
+    }
+    if (e.key === "Enter") {
+      confirmarModalVisivel(e);
     }
   });
 
-  // Aguardar Firebase estar pronto
-  const aguardarFirebase = setInterval(() => {
-    if (window.dbRef && window.firebaseFunctions) {
-      clearInterval(aguardarFirebase);
-      carregarSolicitacoesFirebase();
+  // Fechar modal ao clicar no backdrop (fora do conteúdo)
+  document.addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal")) {
+      fecharModalVisivel();
     }
-  }, 100);
+  });
 
-  // Timeout de segurança
-  setTimeout(() => {
-    clearInterval(aguardarFirebase);
-    if (!window.dbRef) {
-      mostrarNotificacao("Erro ao conectar com o banco de dados", "error");
-    }
-  }, 5000);
-  
+  // CARREGAR SOLICITAÇÕES DO SUPABASE
+  carregarSolicitacoes();
+
   // Mostrar painéis após DOM estar pronto
   mostrarPaineisLogin();
   atualizarIndicadorLogin();
@@ -461,17 +482,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Theme Toggle
 function toggleTheme() {
-  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
   applyTheme(currentTheme);
-  localStorage.setItem('theme', currentTheme);
+  localStorage.setItem("theme", currentTheme);
 }
 
 function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  
-  const slider = document.querySelector('.theme-toggle-slider');
+  document.documentElement.setAttribute("data-theme", theme);
+
+  const slider = document.querySelector(".theme-toggle-slider");
   if (slider) {
-    if (theme === 'light') {
+    if (theme === "light") {
       slider.innerHTML = '<i class="bi bi-sun-fill"></i>';
     } else {
       slider.innerHTML = '<i class="bi bi-moon-fill"></i>';
@@ -479,153 +500,299 @@ function applyTheme(theme) {
   }
 }
 
-// Firebase - CRUD
-function carregarSolicitacoesFirebase() {
-  const { onValue } = window.firebaseFunctions;
-  const dbRef = window.dbRef;
+// ============================================
+// CARREGAR SOLICITAÇÕES DO SUPABASE
+// ============================================
+async function carregarSolicitacoes() {
+  try {
+    // Buscar todas as solicitações com suas versões
+    // 2️⃣ FILTRAR: Não mostrar registros deletados
+    const { data: listaSolicitacoes, error: erroSolicitacoes } = await supabase
+      .from("solicitacoes")
+      .select("id,cliente,empreendimento,status,criado_por,created_at")
+      .is("deletado_em", null)
+      .order("created_at", { ascending: false });
 
-  if (!dbRef || !onValue) {
-    mostrarNotificacao("Erro ao carregar dados", "error");
-    esconderLoader();
-    return;
-  }
-
-  mostrarLoader("Carregando solicitações...");
-
-  onValue(dbRef, (snapshot) => {
-    solicitacoes = [];
-    if (snapshot.exists()) {
-      snapshot.forEach((child) => {
-        const dados = child.val();
-        
-        // Se tem estrutura de versionamento, pegar dados da versão atual
-        if (dados.versoes && dados.versaoAtual) {
-          const versaoAtual = dados.versoes[dados.versaoAtual];
-          solicitacoes.push({ 
-            id: child.key, 
-            ...versaoAtual,
-            versaoAtual: dados.versaoAtual,
-            criadoPor: dados.criadoPor,
-            criadoEm: dados.criadoEm
-          });
-        } else {
-          // Formato antigo (não deve existir mais após limpeza)
-          solicitacoes.push({ id: child.key, ...dados });
-        }
-      });
+    if (erroSolicitacoes) {
+      console.error("Erro ao carregar solicitações:", erroSolicitacoes);
+      mostrarNotificacao("Erro ao carregar solicitações", "error");
+      return;
     }
-    atualizarTabela('todas');
+
+    // Para cada solicitação, buscar a versão mais recente
+    solicitacoes = [];
+
+    for (const sol of listaSolicitacoes) {
+      // Buscar a versão mais recente desta solicitação
+      const { data: versoes, error: erroVersoes } = await supabase
+        .from("solicitacao_versoes")
+        .select("*")
+        .eq("solicitacao_id", sol.id)
+        .order("numero_versao", { ascending: false })
+        .limit(1);
+
+      if (erroVersoes) {
+        console.error("Erro ao carregar versão:", erroVersoes);
+        continue;
+      }
+
+      if (versoes && versoes.length > 0) {
+        const versaoAtual = versoes[0];
+
+        // Mesclar dados da solicitação com dados da versão
+        solicitacoes.push({
+          id: sol.id,
+          ...versaoAtual.dados, // Todos os dados detalhados estão aqui
+          status: sol.status, // Status vem da tabela principal
+          versaoAtual: versaoAtual.numero_versao,
+          criadoPor: versaoAtual.dados.solicitadoPor || "Sistema",
+          criadoEm: sol.created_at,
+        });
+      } else {
+        // Solicitação sem versão (caso dos testes)
+        solicitacoes.push({
+          id: sol.id,
+          cliente: sol.cliente,
+          empreendimento: sol.empreendimento,
+          status: sol.status,
+          criadoEm: sol.created_at,
+          solicitante: "Sistema",
+          nomeEstudo: "Não informado",
+        });
+      }
+    }
+
+    atualizarTabela("todas");
     atualizarEstatisticas();
     atualizarListaTecnicos();
     atualizarEstatisticasTecnico();
-    esconderLoader();
-  });
+
+    // Remover loader inicial após carregar solicitações
+    setTimeout(() => {
+      const loader = document.getElementById("initial-loader");
+      if (loader && !loader.classList.contains("hidden")) {
+        document.body.classList.add("loaded");
+        loader.classList.add("hidden");
+        setTimeout(() => loader.remove(), 300);
+      }
+    }, 200);
+  } catch (erro) {
+    console.error("Erro ao carregar solicitações:", erro);
+    mostrarNotificacao("Erro ao carregar solicitações", "error");
+  }
 }
 
-function salvarSolicitacaoFirebase(dados) {
-  const { ref, runTransaction } = window.firebaseFunctions;
-  const db = window.db;
+// ============================================
+// SALVAR NOVA SOLICITAÇÃO NO SUPABASE
+// ============================================
+async function salvarNovaSolicitacao(dados) {
+  try {
+    // Validação: Status inicial deve ser "fila"
+    const statusInicial = "fila";
 
-  const contadorRef = ref(db, "contador");
+    // Inserir solicitação principal
+    // IMPORTANTE: criado_por = NULL - qualquer pessoa da empresa pode criar
+    const { data: solicitacao, error: erroSolicitacao } = await supabase
+      .from("solicitacoes")
+      .insert({
+        cliente: dados.cliente,
+        empreendimento: dados.empreendimento,
+        status: statusInicial, // Sempre "fila" para novas solicitações
+        criado_por: null,
+      })
+      .select()
+      .single();
 
-  runTransaction(contadorRef, (atual) => {
-    return (atual || 0) + 1;
-  })
-  .then((result) => {
-    const novoId = result.snapshot.val();
-    const { set } = window.firebaseFunctions;
-    const solRef = ref(db, `solicitacoes/${novoId}`);
+    if (erroSolicitacao) {
+      console.error("Supabase error:", erroSolicitacao);
+      console.error(
+        "Detalhes do erro:",
+        JSON.stringify(erroSolicitacao, null, 2),
+      );
+      mostrarNotificacao("Erro ao salvar solicitação!", "error");
+      return false;
+    }
 
-    // Criar solicitação com estrutura de versionamento
-    const agora = new Date().toISOString();
-    const solicitacao = {
-      versaoAtual: 1,
-      criadoPor: dados.solicitante || "Sistema",
-      criadoEm: agora,
-      versoes: {
-        1: {
-          ...dados,
-          id: novoId,
-          status: dados.status || "fila",
-          dataSolicitacao: dados.dataSolicitacao || agora,
-          dataCriacao: agora,
-          solicitadoPor: dados.solicitante || "Sistema",
-          tecnicoResponsavel: dados.tecnicoResponsavel || "PENDENTE",
-        }
-      }
+    // 3️⃣ VALIDAÇÃO: Verificar se solicitação foi criada
+    if (!solicitacao || !solicitacao.id) {
+      console.error("Solicitação não foi criada corretamente");
+      mostrarNotificacao("Erro ao criar solicitação!", "error");
+      return false;
+    }
+
+    // 4️⃣ VALIDAÇÃO: Número de versão inicial
+    const numeroVersaoInicial = 1;
+
+    if (numeroVersaoInicial <= 0) {
+      throw new Error("Número de versão inválido");
+    }
+
+    // Inserir versão inicial com todos os dados
+    const dadosVersao = {
+      ...dados,
+      id: solicitacao.id,
+      status: statusInicial,
+      dataCriacao: new Date().toISOString(),
+      solicitadoPor: dados.solicitante,
+      tecnicoResponsavel: "PENDENTE",
     };
 
-    set(solRef, solicitacao)
-      .then(() => {
-        mostrarNotificacao("Solicitação criada com sucesso!", "success");
-        limparForm();
-        toggleForm();
-      })
-      .catch(() => {
-        mostrarNotificacao("Erro ao salvar solicitação!", "error");
-      })
-      .finally(() => {
-        // Liberar flag de processamento
-        salvarSolicitacao.processando = false;
-        esconderLoader();
+    const { error: erroVersao } = await supabase
+      .from("solicitacao_versoes")
+      .insert({
+        solicitacao_id: solicitacao.id, // 6️⃣ ID validado acima
+        numero_versao: numeroVersaoInicial, // Sempre 1 para primeira versão
+        dados: dadosVersao,
+        tipo: "original",
+        criado_por: null,
       });
-  })
-  .catch(() => {
-    mostrarNotificacao("Erro ao criar solicitação!", "error");
-    salvarSolicitacao.processando = false;
-    esconderLoader();
-  });
-}
 
-function atualizarSolicitacaoFirebase(id, dados) {
-  const { ref, update, get } = window.firebaseFunctions;
-  const db = window.db;
-
-  const solRef = ref(db, `solicitacoes/${id}`);
-
-  // Primeiro buscar a versão atual
-  get(solRef).then((snapshot) => {
-    if (snapshot.exists()) {
-      const solicitacao = snapshot.val();
-      const versaoAtual = solicitacao.versaoAtual || 1;
-      
-      // Atualizar na versão atual
-      const updates = {};
-      Object.keys(dados).forEach(key => {
-        updates[`versoes/${versaoAtual}/${key}`] = dados[key];
-      });
-      
-      update(solRef, updates)
-        .then(() => {
-          // Atualização bem-sucedida
-        })
-        .catch(() => {
-          mostrarNotificacao("Erro ao atualizar!", "error");
-        });
+    if (erroVersao) {
+      console.error("Erro ao criar versão:", erroVersao);
+      mostrarNotificacao("Erro ao salvar solicitação!", "error");
+      return false;
     }
-  });
+
+    // 2️⃣ LOG: Registrar criação de solicitação
+    await registrarLog("criar_solicitacao", "solicitacoes", solicitacao.id, {
+      cliente: solicitacao.cliente,
+      empreendimento: solicitacao.empreendimento,
+      status: solicitacao.status,
+    });
+
+    mostrarNotificacao("Solicitação criada com sucesso!", "success");
+    limparForm(false); // false = não mostrar notificação de formulário limpo
+    toggleForm();
+
+    await carregarSolicitacoes();
+
+    return true;
+  } catch (erro) {
+    console.error("Erro ao salvar solicitação:", erro);
+    mostrarNotificacao("Erro ao salvar solicitação!", "error");
+    return false;
+  }
 }
 
-function excluirSolicitacao(id) {
+// ============================================
+// ATUALIZAR SOLICITAÇÃO NO SUPABASE
+// ============================================
+async function atualizarSolicitacao(id, dados) {
+  try {
+    // Atualizar campos na tabela principal se necessário
+    if (dados.status) {
+      const { error: erroStatus } = await supabase
+        .from("solicitacoes")
+        .update({ status: dados.status })
+        .eq("id", id);
+
+      if (erroStatus) {
+        console.error("Erro ao atualizar status:", erroStatus);
+        return false;
+      }
+    }
+
+    // Buscar a versão atual
+    const { data: versoes, error: erroVersoes } = await supabase
+      .from("solicitacao_versoes")
+      .select("*")
+      .eq("solicitacao_id", id)
+      .order("numero_versao", { ascending: false })
+      .limit(1);
+
+    if (erroVersoes || !versoes || versoes.length === 0) {
+      console.error("Erro ao buscar versão:", erroVersoes);
+      return false;
+    }
+
+    const versaoAtual = versoes[0];
+
+    // Mesclar dados antigos com novos
+    const dadosAtualizados = {
+      ...versaoAtual.dados,
+      ...dados,
+    };
+
+    // Atualizar a versão
+    const { error: erroUpdate } = await supabase
+      .from("solicitacao_versoes")
+      .update({ dados: dadosAtualizados })
+      .eq("id", versaoAtual.id);
+
+    if (erroUpdate) {
+      console.error("Erro ao atualizar versão:", erroUpdate);
+      return false;
+    }
+
+    return true;
+  } catch (erro) {
+    console.error("Erro ao atualizar solicitação:", erro);
+    return false;
+  }
+}
+
+async function excluirSolicitacao(id) {
   if (!acessoGestor) {
     abrirModalAcessoGestor();
     return;
   }
 
-  const { ref, remove } = window.firebaseFunctions;
-  const db = window.db;
+  try {
+    mostrarLoader("Excluindo solicitação...");
 
-  const solRef = ref(db, `solicitacoes/${id}`);
+    // 5️⃣ PROTEÇÃO: Verificar se existe e não está deletada
+    const solicitacao = solicitacoes.find((s) => s.id === id);
+    if (!solicitacao) {
+      esconderLoader();
+      mostrarNotificacao("Solicitação não encontrada!", "error");
+      return;
+    }
 
-  remove(solRef)
-    .then(() => {
-      fecharModalConfirmacao();
-      fecharModal();
-      mostrarNotificacao(`Solicitação #${id} excluída!`, "success");
-    })
-    .catch(() => {
+    if (solicitacao.deletado_em) {
+      esconderLoader();
+      mostrarNotificacao("Solicitação já foi excluída!", "warning");
+      return;
+    }
+
+    // 1️⃣ SOFT DELETE: Marcar como deletado ao invés de excluir
+    const { error } = await supabase
+      .from("solicitacoes")
+      .update({ deletado_em: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Erro ao excluir:", error);
+      esconderLoader();
       mostrarNotificacao("Erro ao excluir!", "error");
-    });
+      return;
+    }
+
+    // Remover da lista local imediatamente
+    const index = solicitacoes.findIndex((s) => s.id === id);
+    if (index !== -1) {
+      solicitacoes.splice(index, 1);
+    }
+
+    // 5️⃣ LOG: Registrar exclusão (soft delete)
+    await registrarLog("excluir_solicitacao", "solicitacoes", id);
+
+    // Fechar modais e esconder loader ANTES de atualizar
+    fecharModalConfirmacao();
+    fecharModal();
+    esconderLoader();
+
+    mostrarNotificacao(`Solicitação #${id} excluída!`, "success");
+
+    // Atualizar tabela e estatísticas de forma assíncrona (não bloqueia UI)
+    setTimeout(() => {
+      atualizarTabela(filtroAtual || "todas");
+      atualizarEstatisticas();
+    }, 0);
+  } catch (erro) {
+    console.error("Erro ao excluir solicitação:", erro);
+    esconderLoader();
+    mostrarNotificacao("Erro ao excluir!", "error");
+  }
 }
 
 // Formulário
@@ -633,43 +800,49 @@ function toggleForm() {
   const formSection = document.querySelector(".form-section");
   const btnToggle = document.getElementById("btnToggleForm");
   const isActive = formSection?.classList.toggle("active");
-  
+
   if (btnToggle) {
     if (isActive) {
-      btnToggle.innerHTML = '<i class="bi bi-chevron-up"></i> Recolher Formulário';
+      btnToggle.innerHTML =
+        '<i class="bi bi-chevron-up"></i> Recolher Formulário';
       formSection?.setAttribute("aria-hidden", "false");
     } else {
-      btnToggle.innerHTML = '<i class="bi bi-file-earmark-plus"></i> Nova Solicitação';
+      btnToggle.innerHTML =
+        '<i class="bi bi-file-earmark-plus"></i> Nova Solicitação';
       formSection?.setAttribute("aria-hidden", "true");
     }
   }
 }
 
-function limparForm() {
+function limparForm(mostrarNotif = true) {
   formSolicitacao?.reset();
   safeSetDisplay("tipoMapaOutros", "none");
   safeSetDisplay("artResponsavelContainer", "none");
   safeSetDisplay("campoElementosOutros", "none");
-  
+
   // Resetar contadores e feedback visual dos textareas
-  const textareas = formSolicitacao?.querySelectorAll('textarea[maxlength]');
-  textareas?.forEach(textarea => {
+  const textareas = formSolicitacao?.querySelectorAll("textarea[maxlength]");
+  textareas?.forEach((textarea) => {
     // Remover classes de limite atingido
-    textarea.classList.remove('limite-atingido');
-    
+    textarea.classList.remove("limite-atingido");
+
     // Resetar contador
-    const helpText = textarea.nextElementSibling || textarea.parentElement.querySelector('.help');
+    const helpText =
+      textarea.nextElementSibling ||
+      textarea.parentElement.querySelector(".help");
     if (helpText) {
-      helpText.classList.remove('limite-atingido');
-      const charCounter = helpText.querySelector('.char-count');
+      helpText.classList.remove("limite-atingido");
+      const charCounter = helpText.querySelector(".char-count");
       if (charCounter) {
-        charCounter.textContent = '0';
+        charCounter.textContent = "0";
       }
     }
   });
-  
-  // Mostrar notificação
-  mostrarNotificacao("Formulário limpo com sucesso!", "success");
+
+  // Mostrar notificação apenas se solicitado (quando usuário clica em limpar)
+  if (mostrarNotif) {
+    mostrarNotificacao("Formulário limpo com sucesso!", "success");
+  }
 }
 
 function toggleTipoMapaOutros() {
@@ -681,7 +854,9 @@ function toggleTipoMapaOutros() {
 }
 
 function toggleARTResponsavel() {
-  const radioSim = document.querySelector('input[name="artNecessaria"][value="sim"]');
+  const radioSim = document.querySelector(
+    'input[name="artNecessaria"][value="sim"]',
+  );
   const campo = document.getElementById("artResponsavelContainer");
   if (campo && radioSim) {
     campo.style.display = radioSim.checked ? "block" : "none";
@@ -696,28 +871,23 @@ function toggleElementosOutros() {
   }
 }
 
-function salvarSolicitacao(e) {
+async function salvarSolicitacao(e) {
   e.preventDefault();
-  
+
   // Proteção contra duplo clique
   if (salvarSolicitacao.processando) {
     mostrarNotificacao("Aguarde, salvando solicitação...", "info");
     return;
   }
-  
-  if (!window.db || !window.firebaseFunctions) {
-    mostrarNotificacao("Firebase não está pronto. Aguarde...", "warning");
-    return;
-  }
-  
+
   // Verificar se o formulário é válido
   const form = e.target;
   if (!form.checkValidity()) {
     // Mostrar notificação
     mostrarNotificacao("Preencha todos os campos obrigatórios (*)", "warning");
-    
+
     // Encontrar o primeiro campo inválido e focar nele
-    const campoInvalido = form.querySelector(':invalid');
+    const campoInvalido = form.querySelector(":invalid");
     if (campoInvalido) {
       campoInvalido.focus();
       // Forçar a exibição da mensagem de validação nativa
@@ -727,13 +897,16 @@ function salvarSolicitacao(e) {
   }
 
   const formData = new FormData(formSolicitacao);
-  
+
   // Validação customizada: se "Outros" em Elementos do Croqui estiver marcado, o campo texto é obrigatório
   const elementoOutros = formData.get("elementoOutros") === "on";
   const elementoOutrosTexto = formData.get("elementoOutrosTexto")?.trim();
-  
+
   if (elementoOutros && !elementoOutrosTexto) {
-    mostrarNotificacao("Por favor, especifique os outros elementos do croqui!", "warning");
+    mostrarNotificacao(
+      "Por favor, especifique os outros elementos do croqui!",
+      "warning",
+    );
     const campoOutrosTexto = document.getElementById("elementoOutrosTexto");
     if (campoOutrosTexto) {
       campoOutrosTexto.focus();
@@ -744,13 +917,16 @@ function salvarSolicitacao(e) {
   // Validação: Data de Entrega deve ser maior ou igual à Data de Solicitação
   const dataSolicitacaoBR = formData.get("dataSolicitacao");
   const dataEntregaBR = formData.get("dataEntrega");
-  
+
   if (dataSolicitacaoBR && dataEntregaBR) {
     const dataSolicitacaoISO = converterDataParaISO(dataSolicitacaoBR);
     const dataEntregaISO = converterDataParaISO(dataEntregaBR);
-    
+
     if (dataEntregaISO < dataSolicitacaoISO) {
-      mostrarNotificacao("A Data de Entrega não pode ser anterior à Data de Solicitação!", "warning");
+      mostrarNotificacao(
+        "A Data de Entrega não pode ser anterior à Data de Solicitação!",
+        "warning",
+      );
       const campoDataEntrega = document.getElementById("dataEntrega");
       if (campoDataEntrega) {
         campoDataEntrega.focus();
@@ -780,7 +956,6 @@ function salvarSolicitacao(e) {
     observacoes: formData.get("observacoes") || "",
     dataSolicitacao: converterDataParaISO(formData.get("dataSolicitacao")),
     dataEntrega: converterDataParaISO(formData.get("dataEntrega")) || "",
-    prazoDias: Number(formData.get("prazoDias")) || 0,
     status: "fila",
     tecnicoResponsavel: "PENDENTE",
     produtos: {
@@ -799,13 +974,11 @@ function salvarSolicitacao(e) {
     },
   };
 
-  const dataSol = dados.dataSolicitacao;
-  const prazo = dados.prazoDias;
-  if (dataSol && prazo > 0) {
-    dados.dataConclusaoPrevista = calcularDataConclusao(dataSol, prazo);
-  }
+  const sucesso = await salvarNovaSolicitacao(dados);
 
-  salvarSolicitacaoFirebase(dados);
+  // Liberar flag de processamento
+  salvarSolicitacao.processando = false;
+  esconderLoader();
 }
 
 // Acesso Gestor / Técnico
@@ -817,16 +990,18 @@ function atualizarIndicadorLogin() {
   const cardNovaSolicitacao = document.getElementById("cardNovaSolicitacao");
   const notificacoesAjustes = document.getElementById("notificacoesAjustes");
   const tituloSolicitacoes = document.getElementById("tituloSolicitacoes");
-  
+
   if (acessoGestor) {
     indicator.style.display = "flex";
-    loginText.innerHTML = '<i class="bi bi-shield-lock"></i> Logado como <strong>Gestor</strong>';
+    loginText.innerHTML =
+      '<i class="bi bi-shield-lock"></i> Logado como <strong>Gestor</strong>';
     btnGestor.style.display = "none";
     btnTecnico.style.display = "none";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
     if (notificacoesAjustes) notificacoesAjustes.style.display = "block";
-    if (tituloSolicitacoes) tituloSolicitacoes.textContent = "Todas as Solicitações";
-    
+    if (tituloSolicitacoes)
+      tituloSolicitacoes.textContent = "Todas as Solicitações";
+
     // Atualizar contador de ajustes pendentes
     setTimeout(() => atualizarContadorAjustesPendentes(), 500);
   } else if (acessoTecnico && tecnicoLogado) {
@@ -836,21 +1011,26 @@ function atualizarIndicadorLogin() {
     btnTecnico.style.display = "none";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "none";
     if (notificacoesAjustes) notificacoesAjustes.style.display = "none";
-    if (tituloSolicitacoes) tituloSolicitacoes.textContent = "Minhas Solicitações";
+    if (tituloSolicitacoes)
+      tituloSolicitacoes.textContent = "Minhas Solicitações";
   } else {
     indicator.style.display = "none";
     btnGestor.style.display = "inline-flex";
     btnTecnico.style.display = "inline-flex";
     if (cardNovaSolicitacao) cardNovaSolicitacao.style.display = "block";
     if (notificacoesAjustes) notificacoesAjustes.style.display = "none";
-    if (tituloSolicitacoes) tituloSolicitacoes.textContent = "Todas as Solicitações";
+    if (tituloSolicitacoes)
+      tituloSolicitacoes.textContent = "Todas as Solicitações";
   }
 }
 
 function abrirModalAcessoGestor() {
   // Bloquear se já estiver logado como técnico
   if (acessoTecnico) {
-    mostrarNotificacao("Você já está logado como Técnico. Faça logout primeiro.", "warning");
+    mostrarNotificacao(
+      "Você já está logado como Técnico. Faça logout primeiro.",
+      "warning",
+    );
     return;
   }
   modalAcessoGestor?.classList.add("active");
@@ -863,35 +1043,24 @@ function fecharModalAcessoGestor() {
   if (input) input.value = "";
 }
 
-// Autenticação com Firebase
-async function verificarCodigoFirebase(codigoDigitado) {
+// Autenticação com Supabase
+async function verificarCodigoSupabase(codigoDigitado) {
   if (!codigoDigitado) {
     mostrarNotificacao("Digite um código!", "warning");
     return null;
   }
 
   try {
-    const caminho = `acessos/${codigoDigitado}`;
-    
-    const snapshot = await window.firebaseFunctions.get(
-      window.firebaseFunctions.ref(window.db, caminho)
-    );
-    
-    if (snapshot.exists()) {
-      const dados = snapshot.val();
-      
-      return {
-        codigo: codigoDigitado,
-        role: dados.role || "tecnico",
-        nome: dados.nome || "",
-        codigoTecnico: dados.codigo || ""
-      };
-    } else {
+    const resultado = await autenticarUsuario(codigoDigitado);
+
+    if (!resultado.sucesso || !resultado.usuario) {
       mostrarNotificacao("Código inválido!", "error");
       return null;
     }
-    
+
+    return resultado.usuario;
   } catch (error) {
+    console.error("Erro ao verificar acesso:", error);
     mostrarNotificacao("Erro ao verificar acesso. Tente novamente.", "error");
     return null;
   }
@@ -899,29 +1068,29 @@ async function verificarCodigoFirebase(codigoDigitado) {
 
 async function validarCodigoAcesso() {
   const codigo = document.getElementById("codigoAcesso")?.value.trim();
-  const usuario = await verificarCodigoFirebase(codigo);
-  
+  const usuario = await verificarCodigoSupabase(codigo);
+
   if (!usuario) {
     return;
   }
-  
-  if (usuario.role !== 'gestor') {
+
+  if (usuario.role !== "gestor") {
     mostrarNotificacao("Este código não é de gestor!", "error");
     return;
   }
-  
+
   // Login como gestor
   acessoGestor = true;
-  salvarLogin('gestor');
+  salvarLogin("gestor");
   mostrarNotificacao("Acesso de gestor concedido!", "success");
   fecharModalAcessoGestor();
   atualizarIndicadorLogin();
   atualizarListaTecnicos();
-  
+
   // Mostrar painel do gestor
   const painelGestor = document.getElementById("painelGestor");
   if (painelGestor) painelGestor.style.display = "block";
-  
+
   // Esconder painel do técnico
   const painelTecnico = document.getElementById("painelTecnico");
   if (painelTecnico) painelTecnico.style.display = "none";
@@ -929,45 +1098,62 @@ async function validarCodigoAcesso() {
 
 async function validarAcessoTecnico() {
   const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
-  const tecnicoSelecionado = document.getElementById("selectTecnicoAcesso")?.value;
-  
+  const tecnicoSelecionado = document.getElementById(
+    "selectTecnicoAcesso",
+  )?.value;
+
   if (!tecnicoSelecionado) {
     mostrarNotificacao("Selecione seu nome primeiro!", "warning");
     return;
   }
-  
-  const usuario = await verificarCodigoFirebase(codigo);
-  
+
+  const usuario = await verificarCodigoSupabase(codigo);
+
   if (!usuario) {
     return;
   }
-  
-  if (usuario.role !== 'tecnico') {
+
+  if (usuario.role !== "tecnico") {
     mostrarNotificacao("Este código não é de técnico!", "error");
     return;
   }
-  
+
+  // Mapear nome do usuário para código do técnico
+  const mapeamentoNomes = {
+    "Laís Mendes": "LAIS",
+    "Laize Rodrigues": "LAIZE",
+    "Valeska Soares": "VALESKA",
+    "Lizabeth Silva": "LIZABETH",
+    "Ismael Alves": "ISMAEL",
+    "Fernando Sousa": "FERNANDO",
+  };
+
+  const codigoTecnico = mapeamentoNomes[usuario.nome];
+
   // Verificar se o código corresponde ao técnico selecionado
-  if (usuario.codigoTecnico !== tecnicoSelecionado) {
-    mostrarNotificacao(`Este código não pertence a ${formatarNomeTecnico(tecnicoSelecionado)}!`, "error");
+  if (codigoTecnico !== tecnicoSelecionado) {
+    mostrarNotificacao(
+      `Este código não pertence a ${formatarNomeTecnico(tecnicoSelecionado)}!`,
+      "error",
+    );
     return;
   }
-  
+
   // Login como técnico
   acessoTecnico = true;
-  tecnicoLogado = usuario.codigoTecnico || usuario.nome;
-  salvarLogin('tecnico', tecnicoLogado);
-  mostrarNotificacao(`Bem-vindo(a), ${usuario.nome || formatarNomeTecnico(tecnicoLogado)}!`, "success");
+  tecnicoLogado = codigoTecnico;
+  salvarLogin("tecnico", tecnicoLogado);
+  mostrarNotificacao(`Bem-vindo(a), ${usuario.nome}!`, "success");
   fecharModalAcessoTecnico();
   atualizarIndicadorLogin();
   atualizarTabela();
   atualizarEstatisticas();
   atualizarEstatisticasTecnico();
-  
+
   // Mostrar painel do técnico
   const painelTecnico = document.getElementById("painelTecnico");
   if (painelTecnico) painelTecnico.style.display = "block";
-  
+
   // Esconder painel do gestor
   const painelGestor = document.getElementById("painelGestor");
   if (painelGestor) painelGestor.style.display = "none";
@@ -976,11 +1162,17 @@ async function validarAcessoTecnico() {
 function abrirModalAcessoTecnico() {
   // Bloquear se já estiver logado como gestor
   if (acessoGestor) {
-    mostrarNotificacao("Você já está logado como Gestor. Faça logout primeiro.", "warning");
+    mostrarNotificacao(
+      "Você já está logado como Gestor. Faça logout primeiro.",
+      "warning",
+    );
     return;
   }
   modalAcessoTecnico?.classList.add("active");
-  setTimeout(() => document.getElementById("codigoAcessoTecnico")?.focus(), 100);
+  setTimeout(
+    () => document.getElementById("codigoAcessoTecnico")?.focus(),
+    100,
+  );
 }
 
 function fecharModalAcessoTecnico() {
@@ -989,21 +1181,20 @@ function fecharModalAcessoTecnico() {
   if (input) input.value = "";
 }
 
-
 function fazerLogout() {
   acessoGestor = false;
   acessoTecnico = false;
   tecnicoLogado = null;
   limparLogin();
   mostrarNotificacao("Logout realizado!", "info");
-  
+
   // Esconder painéis
   const painelGestor = document.getElementById("painelGestor");
   if (painelGestor) painelGestor.style.display = "none";
-  
+
   const painelTecnico = document.getElementById("painelTecnico");
   if (painelTecnico) painelTecnico.style.display = "none";
-  
+
   atualizarTabela();
   atualizarEstatisticas();
   atualizarListaTecnicos();
@@ -1012,10 +1203,10 @@ function fazerLogout() {
 }
 
 // Tabela
-function atualizarTabela(filtroStatus = null) {
+function atualizarTabela(filtroStatus = undefined) {
   if (!tabelaSolicitacoes) return;
 
-  // Armazenar o filtro atual
+  // Só atualiza filtroAtual se um filtro foi explicitamente passado
   if (filtroStatus !== undefined) {
     filtroAtual = filtroStatus;
   }
@@ -1027,7 +1218,7 @@ function atualizarTabela(filtroStatus = null) {
   }
 
   // Filtrar por status apenas se não for 'todas' ou null
-  if (filtroAtual && filtroAtual !== 'todas') {
+  if (filtroAtual && filtroAtual !== "todas") {
     base = base.filter((s) => s.status === filtroAtual);
   }
 
@@ -1042,19 +1233,19 @@ function atualizarTabela(filtroStatus = null) {
   const html = base
     .sort((a, b) => b.id - a.id)
     .map((s) => {
-      const statusClass = `status-${s.status}`;
+      const statusClass = getStatusClass(s.status);
       return `
         <tr>
           <td>#${String(s.id).padStart(4, "0")}</td>
-          <td>${escapeHtml(s.solicitante || "")}</td>
-          <td>${escapeHtml(s.nomeEstudo || "Não informado")}</td>
-          <td>${escapeHtml(s.cliente || "")}</td>
-          <td>${escapeHtml(formatarTipoMapa(s.tipoMapa, s.nomeTipoMapa))}</td>
-          <td>${escapeHtml(s.municipio || "")}</td>
+          <td title="${escapeAttr(s.solicitante || "")}">${escapeHtml(s.solicitante || "")}</td>
+          <td title="${escapeAttr(s.nomeEstudo || "Não informado")}">${escapeHtml(s.nomeEstudo || "Não informado")}</td>
+          <td title="${escapeAttr(s.cliente || "")}">${escapeHtml(s.cliente || "")}</td>
+          <td title="${escapeAttr(formatarTipoMapa(s.tipoMapa, s.nomeTipoMapa))}">${escapeHtml(formatarTipoMapa(s.tipoMapa, s.nomeTipoMapa))}</td>
+          <td title="${escapeAttr(s.municipio || "")}">${escapeHtml(s.municipio || "")}</td>
           <td>${escapeHtml(formatarNomeTecnico(s.tecnicoResponsavel))}</td>
           <td><span class="status-badge ${statusClass}">${escapeHtml(
-        formatarStatus(s.status)
-      )}</span></td>
+            formatarStatus(s.status),
+          )}</span></td>
           <td>${formatDateBR(s.dataSolicitacao)}</td>
           <td>
             <button class="btn action-btn btn-info" type="button" onclick="verDetalhes(${s.id})">
@@ -1072,17 +1263,17 @@ function atualizarTabela(filtroStatus = null) {
 // Detalhes da Solicitação
 function verDetalhes(id) {
   const solicitacao = solicitacoes.find((s) => s.id == id);
-  
+
   if (!solicitacao) {
     mostrarNotificacao("Solicitação não encontrada!", "error");
     return;
   }
-  
+
   if (!conteudoDetalhes) {
     return;
   }
 
-  const dataSolicitacao = solicitacao.dataSolicitacao 
+  const dataSolicitacao = solicitacao.dataSolicitacao
     ? formatDateBR(solicitacao.dataSolicitacao)
     : "—";
   const dataCriacao = solicitacao.dataCriacao
@@ -1099,7 +1290,7 @@ function verDetalhes(id) {
     : "—";
 
   let statusPrazo = "";
-  if (solicitacao.status === "finalizado" && solicitacao.dataConclusaoReal) {
+  if (solicitacao.status === "concluido" && solicitacao.dataConclusaoReal) {
     const prevista = parseDateOnly(solicitacao.dataConclusaoPrevista);
     const real = parseDateOnly(solicitacao.dataConclusaoReal);
     if (prevista && real) {
@@ -1119,8 +1310,7 @@ function verDetalhes(id) {
   let elementosHtml = "";
   if (elementos.localizacao) elementosHtml += "✓ Localização ";
   if (elementos.acessoLocal) elementosHtml += "✓ Via de Acesso Local ";
-  if (elementos.acessoRegional)
-    elementosHtml += "✓ Via de Acesso Regional ";
+  if (elementos.acessoRegional) elementosHtml += "✓ Via de Acesso Regional ";
   if (elementos.areaAmostral) elementosHtml += "✓ ãrea Amostral ";
   if (elementos.outros && elementos.outrosTexto) {
     elementosHtml += `✓ Outros: ${escapeHtml(elementos.outrosTexto)} `;
@@ -1140,7 +1330,7 @@ function verDetalhes(id) {
           <div class="detalhe-item">
             <div class="detalhe-label">Status</div>
             <div class="detalhe-value">
-              <span class="status-badge status-${solicitacao.status}">${escapeHtml(formatarStatus(solicitacao.status))}</span>
+              <span class="status-badge ${getStatusClass(solicitacao.status)}">${escapeHtml(formatarStatus(solicitacao.status))}</span>
             </div>
           </div>
           <div class="detalhe-item">
@@ -1174,11 +1364,11 @@ function verDetalhes(id) {
             </label>
             <div style="position: relative;">
               <select id="selectEstagio${solicitacao.id}" style="width: 100%; padding: 12px 40px 12px 12px; border-radius: 8px; border: 2px solid rgba(59, 130, 246, 0.5); background: var(--bg-secondary); color: var(--text-primary); font-size: 0.95rem; font-weight: 500; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none;">
-                <option value="" disabled ${!solicitacao.status ? 'selected' : ''}>Selecione um estágio...</option>
-                <option value="fila" ${solicitacao.status === 'fila' ? 'selected' : ''}>Na Fila</option>
-                <option value="processando" ${solicitacao.status === 'processando' ? 'selected' : ''}>Processando</option>
-                <option value="aguardando" ${solicitacao.status === 'aguardando' ? 'selected' : ''}>Aguardando Dados</option>
-                <option value="finalizado" ${solicitacao.status === 'finalizado' ? 'selected' : ''}>Finalizado</option>
+                <option value="" disabled ${!solicitacao.status ? "selected" : ""}>Selecione um estágio...</option>
+                <option value="fila" ${solicitacao.status === "fila" ? "selected" : ""}>Na Fila</option>
+                <option value="em_andamento" ${solicitacao.status === "em_andamento" ? "selected" : ""}>Em Andamento</option>
+                <option value="ajustes_pendentes" ${solicitacao.status === "ajustes_pendentes" ? "selected" : ""}>Ajustes Pendentes</option>
+                <option value="concluido" ${solicitacao.status === "concluido" ? "selected" : ""}>Concluído</option>
               </select>
               <i class="bi bi-chevron-down" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: rgba(59, 130, 246, 0.8); font-size: 1.2rem;"></i>
             </div>
@@ -1199,7 +1389,10 @@ function verDetalhes(id) {
         </div>
       </div>
           `;
-        } else if (acessoTecnico && solicitacao.tecnicoResponsavel === tecnicoLogado) {
+        } else if (
+          acessoTecnico &&
+          solicitacao.tecnicoResponsavel === tecnicoLogado
+        ) {
           return `
       <!-- Seção: Ações do Técnico -->
       <div class="detalhe-section" style="background: rgba(234, 179, 8, 0.05); border: 1px solid rgba(234, 179, 8, 0.2);">
@@ -1211,10 +1404,10 @@ function verDetalhes(id) {
             </label>
             <div style="position: relative;">
               <select id="selectEstagio${solicitacao.id}" style="width: 100%; padding: 12px 40px 12px 12px; border-radius: 8px; border: 2px solid rgba(234, 179, 8, 0.5); background: var(--bg-secondary); color: var(--text-primary); font-size: 0.95rem; font-weight: 500; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none;">
-                <option value="" disabled ${!solicitacao.status ? 'selected' : ''}>Selecione um estágio...</option>
-                <option value="processando" ${solicitacao.status === 'processando' ? 'selected' : ''}>Processando</option>
-                <option value="aguardando" ${solicitacao.status === 'aguardando' ? 'selected' : ''}>Aguardando Dados</option>
-                <option value="finalizado" ${solicitacao.status === 'finalizado' ? 'selected' : ''}>Finalizado</option>
+                <option value="" disabled ${!solicitacao.status ? "selected" : ""}>Selecione um estágio...</option>
+                <option value="em_andamento" ${solicitacao.status === "em_andamento" ? "selected" : ""}>Em Andamento</option>
+                <option value="ajustes_pendentes" ${solicitacao.status === "ajustes_pendentes" ? "selected" : ""}>Ajustes Pendentes</option>
+                <option value="concluido" ${solicitacao.status === "concluido" ? "selected" : ""}>Concluído</option>
               </select>
               <i class="bi bi-chevron-down" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: rgba(234, 179, 8, 0.8); font-size: 1.2rem;"></i>
             </div>
@@ -1226,11 +1419,13 @@ function verDetalhes(id) {
       </div>
           `;
         } else {
-          return '';
+          return "";
         }
       })()}
 
-      ${(acessoGestor || acessoTecnico) ? `
+      ${
+        acessoGestor || acessoTecnico
+          ? `
       <!-- Seção: Histórico de Versões -->
       <div class="detalhe-section detalhe-historico">
         <h4 class="detalhe-historico-title">
@@ -1243,7 +1438,9 @@ function verDetalhes(id) {
           <i class="bi bi-clock-history"></i> Ver Histórico Completo
         </button>
       </div>
-      ` : ""}
+      `
+          : ""
+      }
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-file-text"></i> Dados Gerais</h4>
         <div class="detalhe-grid">
@@ -1305,12 +1502,16 @@ function verDetalhes(id) {
             <div class="detalhe-label">Conclusão Real</div>
             <div class="detalhe-value">${dataConclusaoReal}</div>
           </div>
-          ${statusPrazo ? `
+          ${
+            statusPrazo
+              ? `
           <div class="detalhe-item">
             <div class="detalhe-label">Situação do Prazo</div>
             <div class="detalhe-value">${statusPrazo}</div>
           </div>
-          ` : ""}
+          `
+              : ""
+          }
         </div>
       </div>
 
@@ -1330,12 +1531,16 @@ function verDetalhes(id) {
             <div class="detalhe-label">ART Necessária</div>
             <div class="detalhe-value">${solicitacao.artNecessaria === "sim" ? "✓ Sim" : "✓ Não"}</div>
           </div>
-          ${solicitacao.artNecessaria === "sim" && solicitacao.artResponsavel ? `
+          ${
+            solicitacao.artNecessaria === "sim" && solicitacao.artResponsavel
+              ? `
           <div class="detalhe-item">
             <div class="detalhe-label">Responsável Técnico</div>
             <div class="detalhe-value">${escapeHtml(solicitacao.artResponsavel)}</div>
           </div>
-          ` : ""}
+          `
+              : ""
+          }
           <div class="detalhe-item detalhe-item-full">
             <div class="detalhe-label"><i class="bi bi-box-seam"></i> Produtos Solicitados</div>
             <div class="detalhe-value">${produtosHtml || "Nenhum produto selecionado"}</div>
@@ -1362,7 +1567,9 @@ function verDetalhes(id) {
         </div>
       </div>
 
-      ${solicitacao.observacoes ? `
+      ${
+        solicitacao.observacoes
+          ? `
       <!-- Seção: Observações -->
       <div class="detalhe-section">
         <h4 class="detalhe-section-title"><i class="bi bi-chat-left-text"></i> Observações</h4>
@@ -1370,7 +1577,9 @@ function verDetalhes(id) {
           ${escapeHtml(solicitacao.observacoes)}
         </div>
       </div>
-      ` : ""}
+      `
+          : ""
+      }
 
     </div>
   `;
@@ -1382,19 +1591,19 @@ function fecharModal() {
   modalDetalhes?.classList.remove("active");
 }
 
-function mudarStatus(id, novoStatus) {
+async function mudarStatus(id, novoStatus) {
   if (!novoStatus) {
     mostrarNotificacao("Selecione um estágio!", "warning");
     return;
   }
-  
+
   if (!acessoGestor && !acessoTecnico) {
     mostrarNotificacao("Faça login para alterar status!", "warning");
     return;
   }
 
   const solicitacao = solicitacoes.find((s) => s.id == id);
-  
+
   if (!solicitacao) {
     return;
   }
@@ -1402,41 +1611,60 @@ function mudarStatus(id, novoStatus) {
   if (acessoTecnico && solicitacao.tecnicoResponsavel !== tecnicoLogado) {
     mostrarNotificacao(
       "Você só pode alterar solicitações atribuídas a você!",
-      "warning"
+      "warning",
     );
     return;
   }
 
-  atualizarSolicitacaoFirebase(id, { status: novoStatus });
+  const sucesso = await atualizarSolicitacao(id, { status: novoStatus });
+
+  // 3️⃣ LOG: Registrar alteração de status
+  registrarLog("alterar_status", "solicitacoes", id, {
+    status_anterior: solicitacao.status,
+    novo_status: novoStatus,
+  });
 
   const mensagem = {
     fila: "movida para a fila",
-    processando: "iniciou o processamento",
-    aguardando: "está aguardando dados",
-    finalizado: "foi finalizada",
+    em_andamento: "iniciou o processamento",
+    ajustes_pendentes: "está aguardando ajustes",
+    concluido: "foi concluída",
   };
 
-  mostrarNotificacao(
-    `Solicitação #${id} ${mensagem[novoStatus] || "atualizada"}!`,
-    "success"
-  );
-  
-  // Atualizar o status localmente e reabrir os detalhes
+  if (sucesso) {
+    mostrarNotificacao(
+      `Solicitação #${id} ${mensagem[novoStatus] || "atualizada"}!`,
+      "success",
+    );
+  } else {
+    mostrarNotificacao("Erro ao atualizar status!", "error");
+    return;
+  }
+
+  // Atualizar o status localmente
   solicitacao.status = novoStatus;
+
+  // Atualizar a tabela imediatamente
+  atualizarTabela(filtroAtual || "todas");
+
+  // Atualizar estatísticas
+  atualizarEstatisticas();
+
+  // Reabrir os detalhes
   setTimeout(() => verDetalhes(id), 300);
 }
 
 function salvarNovoStatus(id) {
   const select = document.getElementById(`selectEstagio${id}`);
-  
+
   if (!select) {
     return;
   }
-  
+
   const novoStatus = select.value;
   mudarStatus(id, novoStatus);
 }
-function finalizarSolicitacao(id) {
+async function finalizarSolicitacao(id) {
   if (!acessoGestor && !acessoTecnico) {
     mostrarNotificacao("Faça login para finalizar!", "warning");
     return;
@@ -1448,23 +1676,43 @@ function finalizarSolicitacao(id) {
   if (acessoTecnico && solicitacao.tecnicoResponsavel !== tecnicoLogado) {
     mostrarNotificacao(
       "Você só pode finalizar solicitações atribuídas a você!",
-      "warning"
+      "warning",
     );
     return;
   }
 
-  if (solicitacao.status === "finalizado") {
-    mostrarNotificacao("Esta Solicitação já foi finalizada.", "info");
+  if (solicitacao.status === "concluido") {
+    mostrarNotificacao("Esta Solicitação já foi concluída.", "info");
     return;
   }
 
-  atualizarSolicitacaoFirebase(id, {
-    status: "finalizado",
+  const sucesso = await atualizarSolicitacao(id, {
+    status: "concluido",
     dataConclusaoReal: new Date().toISOString().split("T")[0],
   });
 
-  fecharModal();
+  // 4️⃣ LOG: Registrar finalização de solicitação
+  registrarLog("finalizar_solicitacao", "solicitacoes", id);
+
+  if (!sucesso) {
+    mostrarNotificacao("Erro ao finalizar solicitação!", "error");
+    return;
+  }
+
   mostrarNotificacao(`Solicitação #${id} finalizada!`, "success");
+
+  // Atualizar o status localmente
+  solicitacao.status = "concluido";
+  solicitacao.dataConclusaoReal = new Date().toISOString().split("T")[0];
+
+  // Atualizar a tabela imediatamente
+  atualizarTabela(filtroAtual || "todas");
+
+  // Atualizar estatísticas
+  atualizarEstatisticas();
+
+  // Fechar modal
+  fecharModal();
 }
 
 function abrirModalAtribuicao(id) {
@@ -1479,9 +1727,7 @@ function abrirModalAtribuicao(id) {
   conteudoAtribuicao.innerHTML = `
     <div class="form-group">
       <p><strong>Solicitação #${id}</strong></p>
-      <p>Estudo: ${escapeHtml(
-        solicitacao.nomeEstudo || "Não informado"
-      )}</p>
+      <p>Estudo: ${escapeHtml(solicitacao.nomeEstudo || "Não informado")}</p>
       <p>Cliente: ${escapeHtml(solicitacao.cliente || "")}</p>
     </div>
 
@@ -1506,7 +1752,7 @@ function abrirModalAtribuicao(id) {
     <div class="btn-group justify-end" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalAtribuicao()">Cancelar</button>
       <button class="btn btn-primary" type="button" onclick="atribuirTecnico(${Number(
-        id
+        id,
       )})">Atribuir</button>
     </div>
   `;
@@ -1516,11 +1762,10 @@ function abrirModalAtribuicao(id) {
     sel.value = solicitacao.tecnicoResponsavel;
 
   modalAtribuicao?.classList.add("active");
-  
-  // Aplicar máscara no campo de data após o modal ser aberto
+  modalAtribuicao.dataset.solicitacaoId = id;
   setTimeout(() => {
     aplicarMascaraData(document.getElementById("inputDataConclusao"));
-    
+
     // Adicionar evento Enter para atribuir
     const modal = document.getElementById("modalAtribuicao");
     if (modal) {
@@ -1530,7 +1775,7 @@ function abrirModalAtribuicao(id) {
           atribuirTecnico(id);
         }
       };
-      
+
       // Remover listener anterior se existir
       modal.removeEventListener("keypress", handleEnter);
       modal.addEventListener("keypress", handleEnter);
@@ -1542,7 +1787,7 @@ function fecharModalAtribuicao() {
   modalAtribuicao?.classList.remove("active");
 }
 
-function atribuirTecnico(id) {
+async function atribuirTecnico(id) {
   const tecnico = document.getElementById("selectTecnico")?.value;
   const dataConclusaoBR = document.getElementById("inputDataConclusao")?.value;
 
@@ -1550,55 +1795,89 @@ function atribuirTecnico(id) {
     mostrarNotificacao("Selecione um Técnico!", "warning");
     return;
   }
-  
+
   // Validar data se fornecida
   if (dataConclusaoBR && dataConclusaoBR.length > 0) {
     if (dataConclusaoBR.length !== 10) {
       mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
       return;
     }
-    
-    const partes = dataConclusaoBR.split('/');
+
+    const partes = dataConclusaoBR.split("/");
     if (partes.length !== 3) {
       mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
       return;
     }
-    
+
     const dia = parseInt(partes[0]);
     const mes = parseInt(partes[1]);
     const ano = parseInt(partes[2]);
-    
+
     // Validação básica de ranges
-    if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2100) {
+    if (
+      dia < 1 ||
+      dia > 31 ||
+      mes < 1 ||
+      mes > 12 ||
+      ano < 1900 ||
+      ano > 2100
+    ) {
       mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
       return;
     }
-    
+
     // Validação se a data realmente existe (ex: 31/02 não existe)
-    const dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-    const dataObj = new Date(dataISO + 'T00:00:00');
-    
+    const dataISO = `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+    const dataObj = new Date(dataISO + "T00:00:00");
+
     // Verificar se a data é válida comparando os valores
-    if (dataObj.getDate() !== dia || dataObj.getMonth() + 1 !== mes || dataObj.getFullYear() !== ano) {
-      mostrarNotificacao("Data inválida! Esta data não existe no calendário.", "warning");
+    if (
+      dataObj.getDate() !== dia ||
+      dataObj.getMonth() + 1 !== mes ||
+      dataObj.getFullYear() !== ano
+    ) {
+      mostrarNotificacao(
+        "Data inválida! Esta data não existe no calendário.",
+        "warning",
+      );
       return;
     }
   }
-  
-  // Converter data BR para ISO se fornecida
-  const dataConclusao = dataConclusaoBR ? converterDataParaISO(dataConclusaoBR) : null;
 
-  atualizarSolicitacaoFirebase(id, {
+  // Converter data BR para ISO se fornecida
+  const dataConclusao = dataConclusaoBR
+    ? converterDataParaISO(dataConclusaoBR)
+    : null;
+
+  const sucesso = await atualizarSolicitacao(id, {
     tecnicoResponsavel: tecnico,
     dataConclusaoPrevista: dataConclusao || null,
-    status: "processando",
+    status: "em_andamento",
   });
 
+  // Atualizar localmente
+  const solicitacao = solicitacoes.find((s) => s.id == id);
+  if (solicitacao) {
+    solicitacao.tecnicoResponsavel = tecnico;
+    solicitacao.dataConclusaoPrevista = dataConclusao;
+    solicitacao.status = "em_andamento";
+  }
+
   fecharModalAtribuicao();
-  mostrarNotificacao(
-    `Solicitação #${id} atribuída para ${formatarNomeTecnico(tecnico)}!`,
-    "success"
-  );
+
+  if (sucesso) {
+    mostrarNotificacao(
+      `Solicitação #${id} atribuída para ${formatarNomeTecnico(tecnico)}!`,
+      "success",
+    );
+  } else {
+    mostrarNotificacao("Erro ao atribuir técnico!", "error");
+  }
+
+  // Atualizar tabela e estatísticas
+  atualizarTabela(filtroAtual || "todas");
+  atualizarEstatisticas();
+  atualizarListaTecnicos();
 }
 
 function confirmarExclusao(id) {
@@ -1614,7 +1893,7 @@ function confirmarExclusao(id) {
     <p><strong>Confirmar Exclusão</strong></p>
     <p style="margin-top: 8px;">
       Tem certeza que deseja excluir a Solicitação #${id} de ${escapeHtml(
-        solicitacao.cliente || ""
+        solicitacao.cliente || "",
       )}?
     </p>
     <p style="margin-top: 8px; color: var(--warning);">
@@ -1623,7 +1902,7 @@ function confirmarExclusao(id) {
     <div class="btn-group justify-end" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">Cancelar</button>
       <button class="btn btn-danger" type="button" onclick="excluirSolicitacao(${Number(
-        id
+        id,
       )})">Excluir</button>
     </div>
   `;
@@ -1640,13 +1919,13 @@ function filtrarSolicitacoes(tipo) {
   let statusFiltro = null;
   switch (tipo) {
     case "em_andamento":
-      statusFiltro = null;
+      statusFiltro = "em_andamento";
       break;
     case "na_fila":
       statusFiltro = "fila";
       break;
-    case "aguardando_dados":
-      statusFiltro = "aguardando";
+    case "ajustes_pendentes":
+      statusFiltro = "ajustes_pendentes";
       break;
     default:
       statusFiltro = null;
@@ -1659,15 +1938,15 @@ function filtrarSolicitacoes(tipo) {
 function filtrarMinhasSolicitacoes(tipo) {
   let statusFiltro = null;
   switch (tipo) {
-    case "processando":
-      statusFiltro = "processando";
+    case "em_andamento":
+      statusFiltro = "em_andamento";
       break;
-    case "aguardando":
-      statusFiltro = "aguardando";
+    case "ajustes_pendentes":
+      statusFiltro = "ajustes_pendentes";
       break;
     case "finalizadas":
-    case "finalizado":
-      statusFiltro = "finalizado";
+    case "concluido":
+      statusFiltro = "concluido";
       break;
     default:
       statusFiltro = null;
@@ -1707,11 +1986,11 @@ function gerarRelatorio() {
     mostrarNotificacao("Selecione o período!", "warning");
     return;
   }
-  
+
   // Converter datas BR para ISO
   const dataInicio = converterDataParaISO(dataInicioBR);
   const dataFim = converterDataParaISO(dataFimBR);
-  
+
   if (parseDateOnly(dataInicio) > parseDateOnly(dataFim)) {
     mostrarNotificacao("Data inicial maior que final!", "error");
     return;
@@ -1724,7 +2003,7 @@ function gerarRelatorio() {
 
   const total = solicitacoesPeriodo.length;
   const finalizadas = solicitacoesPeriodo.filter(
-    (s) => s.status === "finalizado"
+    (s) => s.status === "concluido",
   ).length;
 
   const dentroPrazo = solicitacoesPeriodo.filter((s) => {
@@ -1734,27 +2013,29 @@ function gerarRelatorio() {
     const prevista = s.dataConclusaoPrevista
       ? parseDateOnly(s.dataConclusaoPrevista)
       : null;
-    return (
-      s.status === "finalizado" &&
-      real &&
-      prevista &&
-      real <= prevista
-    );
+    return s.status === "concluido" && real && prevista && real <= prevista;
   }).length;
 
   const foraPrazo = finalizadas - dentroPrazo;
 
   // Lista de técnicos conhecidos
-  const tecnicos = ["LAIS", "LAIZE", "VALESKA", "LIZABETH", "ISMAEL", "FERNANDO"];
+  const tecnicos = [
+    "LAIS",
+    "LAIZE",
+    "VALESKA",
+    "LIZABETH",
+    "ISMAEL",
+    "FERNANDO",
+  ];
   const estatisticasTecnicos = {};
 
   tecnicos.forEach((tecnico) => {
     const solTec = solicitacoesPeriodo.filter(
-      (s) => s.tecnicoResponsavel === tecnico
+      (s) => s.tecnicoResponsavel === tecnico,
     );
     estatisticasTecnicos[tecnico] = {
       total: solTec.length,
-      finalizadas: solTec.filter((s) => s.status === "finalizado").length,
+      finalizadas: solTec.filter((s) => s.status === "concluido").length,
       dentroPrazo: solTec.filter((s) => {
         const real = s.dataConclusaoReal
           ? parseDateOnly(s.dataConclusaoReal)
@@ -1762,12 +2043,7 @@ function gerarRelatorio() {
         const prevista = s.dataConclusaoPrevista
           ? parseDateOnly(s.dataConclusaoPrevista)
           : null;
-        return (
-          s.status === "finalizado" &&
-          real &&
-          prevista &&
-          real <= prevista
-        );
+        return s.status === "concluido" && real && prevista && real <= prevista;
       }).length,
     };
   });
@@ -1801,10 +2077,9 @@ function gerarRelatorio() {
   tecnicos.forEach((tecnico) => {
     const stats = estatisticasTecnicos[tecnico];
     if (stats.total > 0) {
-      const taxaConclusao = (
-        (stats.finalizadas / stats.total) *
-        100
-      ).toFixed(1);
+      const taxaConclusao = ((stats.finalizadas / stats.total) * 100).toFixed(
+        1,
+      );
       const taxaPrazo =
         stats.finalizadas > 0
           ? ((stats.dentroPrazo / stats.finalizadas) * 100).toFixed(1)
@@ -1841,7 +2116,7 @@ function gerarRelatorio() {
     <div class="btn-group" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalRelatorio()">Fechar</button>
       <button class="btn btn-info" type="button" onclick="exportarRelatorioCompleto('${escapeAttr(
-        dataInicio
+        dataInicio,
       )}', '${escapeAttr(dataFim)}')"> Exportar CSV</button>
     </div>
   `;
@@ -1866,7 +2141,7 @@ function exportarRelatorioCompleto(dataInicio, dataFim) {
 
   const dadosExport = solicitacoesPeriodo.map((s) => {
     const dentroPrazo =
-      s.status === "finalizado" &&
+      s.status === "concluido" &&
       s.dataConclusaoReal &&
       s.dataConclusaoPrevista &&
       parseDateOnly(s.dataConclusaoReal) <=
@@ -1883,25 +2158,24 @@ function exportarRelatorioCompleto(dataInicio, dataFim) {
       Status: formatarStatus(s.status),
       "Prazo (dias úteis)": s.prazoDias,
       "Diretório Arquivos": s.diretorioArquivos || "Não especificado",
-      "Diretório Salvamento":
-        s.diretorioSalvamento || "Não especificado",
+      "Diretório Salvamento": s.diretorioSalvamento || "Não especificado",
       "Data Solicitação": formatDateBR(s.dataSolicitacao),
       "Conclusão Prevista": formatDateBR(s.dataConclusaoPrevista),
       "Conclusão Real": s.dataConclusaoReal
         ? formatDateBR(s.dataConclusaoReal)
         : "",
       "Dentro do Prazo":
-        s.status === "finalizado"
+        s.status === "concluido"
           ? dentroPrazo
             ? "SIM"
-            : "NãO"
+            : "NÃO"
           : "EM ANDAMENTO",
     };
   });
 
   downloadCSV(
     dadosExport,
-    `relatorio_solicitacoes_${dataInicio}_a_${dataFim}.csv`
+    `relatorio_solicitacoes_${dataInicio}_a_${dataFim}.csv`,
   );
   mostrarNotificacao("Relatório exportado!", "success");
 }
@@ -1914,7 +2188,7 @@ function exportarTodosDados() {
 
   const dadosExport = solicitacoes.map((s) => {
     const dentroPrazo =
-      s.status === "finalizado" &&
+      s.status === "concluido" &&
       s.dataConclusaoReal &&
       s.dataConclusaoPrevista &&
       parseDateOnly(s.dataConclusaoReal) <=
@@ -1931,27 +2205,24 @@ function exportarTodosDados() {
       Status: formatarStatus(s.status),
       "Prazo (dias úteis)": s.prazoDias,
       "Diretório Arquivos": s.diretorioArquivos || "Não especificado",
-      "Diretório Salvamento":
-        s.diretorioSalvamento || "Não especificado",
+      "Diretório Salvamento": s.diretorioSalvamento || "Não especificado",
       "Data Solicitação": formatDateBR(s.dataSolicitacao),
       "Conclusão Prevista": formatDateBR(s.dataConclusaoPrevista),
       "Conclusão Real": s.dataConclusaoReal
         ? formatDateBR(s.dataConclusaoReal)
         : "",
       "Dentro do Prazo":
-        s.status === "finalizado"
+        s.status === "concluido"
           ? dentroPrazo
             ? "SIM"
-            : "NãO"
+            : "NÃO"
           : "EM ANDAMENTO",
     };
   });
 
   downloadCSV(
     dadosExport,
-    `todos_dados_solicitacoes_${
-      new Date().toISOString().split("T")[0]
-    }.csv`
+    `todos_dados_solicitacoes_${new Date().toISOString().split("T")[0]}.csv`,
   );
   mostrarNotificacao("Todos os dados exportados!", "success");
 }
@@ -1964,17 +2235,14 @@ function atualizarEstatisticas() {
       : solicitacoes;
 
   setText("totalSolicitacoes", base.length);
-  setText(
-    "totalFila",
-    base.filter((s) => s.status === "fila").length
-  );
+  setText("totalFila", base.filter((s) => s.status === "fila").length);
   setText(
     "totalProcessando",
-    base.filter((s) => s.status === "processando").length
+    base.filter((s) => s.status === "em_andamento").length,
   );
   setText(
     "totalFinalizadas",
-    base.filter((s) => s.status === "finalizado").length
+    base.filter((s) => s.status === "concluido").length,
   );
 }
 
@@ -1988,12 +2256,19 @@ function atualizarListaTecnicos() {
   }
 
   // Lista de técnicos conhecidos
-  const tecnicos = ["LAIS", "LAIZE", "VALESKA", "LIZABETH", "ISMAEL", "FERNANDO"];
+  const tecnicos = [
+    "LAIS",
+    "LAIZE",
+    "VALESKA",
+    "LIZABETH",
+    "ISMAEL",
+    "FERNANDO",
+  ];
   let html = "";
 
   tecnicos.forEach((tecnico) => {
     const solTec = solicitacoes.filter(
-      (s) => s.tecnicoResponsavel === tecnico && s.status !== "finalizado"
+      (s) => s.tecnicoResponsavel === tecnico && s.status !== "concluido",
     );
     if (solTec.length > 0) {
       html += `
@@ -2006,15 +2281,13 @@ function atualizarListaTecnicos() {
               .map(
                 (s) =>
                   `<div class="muted">${escapeHtml(
-                    s.nomeEstudo || "Sem nome"
-                  )} - ${escapeHtml(formatarStatus(s.status))}</div>`
+                    s.nomeEstudo || "Sem nome",
+                  )} - ${escapeHtml(formatarStatus(s.status))}</div>`,
               )
               .join("")}
             ${
               solTec.length > 3
-                ? `<div class="muted">+ ${
-                    solTec.length - 3
-                  } outro(s)</div>`
+                ? `<div class="muted">+ ${solTec.length - 3} outro(s)</div>`
                 : ""
             }
           </div>
@@ -2024,8 +2297,7 @@ function atualizarListaTecnicos() {
   });
 
   if (!html) {
-    html =
-      '<p class="muted">Nenhum Técnico com projetos em andamento</p>';
+    html = '<p class="muted">Nenhum Técnico com projetos em andamento</p>';
   }
 
   listaTecnicos.innerHTML = html;
@@ -2041,14 +2313,10 @@ function atualizarEstatisticasTecnico() {
   }
 
   const solTec = solicitacoes.filter(
-    (s) => s.tecnicoResponsavel === tecnicoLogado
+    (s) => s.tecnicoResponsavel === tecnicoLogado,
   );
-  const emAndamento = solTec.filter(
-    (s) => s.status !== "finalizado"
-  ).length;
-  const finalizadas = solTec.filter(
-    (s) => s.status === "finalizado"
-  ).length;
+  const emAndamento = solTec.filter((s) => s.status !== "concluido").length;
+  const finalizadas = solTec.filter((s) => s.status === "concluido").length;
 
   const dentroPrazo = solTec.filter((s) => {
     const real = s.dataConclusaoReal
@@ -2057,12 +2325,7 @@ function atualizarEstatisticasTecnico() {
     const prevista = s.dataConclusaoPrevista
       ? parseDateOnly(s.dataConclusaoPrevista)
       : null;
-    return (
-      s.status === "finalizado" &&
-      real &&
-      prevista &&
-      real <= prevista
-    );
+    return s.status === "concluido" && real && prevista && real <= prevista;
   }).length;
 
   estatisticasTecnico.innerHTML = `
@@ -2088,29 +2351,11 @@ function atualizarEstatisticasTecnico() {
 }
 
 // Helpers
-function bindEnterNoModal(modalEl, callback) {
-  if (!modalEl) return;
-  modalEl.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    callback();
-  });
-}
-
 function parseDateOnly(yyyy_mm_dd) {
   if (!yyyy_mm_dd) return null;
   const d = new Date(`${yyyy_mm_dd}T00:00:00`);
   return isNaN(d) ? null : d;
 }
-
-function formatDateBR(dateOrStr) {
-  const d =
-    typeof dateOrStr === "string" ? parseDateOnly(dateOrStr) : dateOrStr;
-  return d instanceof Date && !isNaN(d)
-    ? d.toLocaleDateString("pt-BR")
-    : "-";
-}
-
 
 // Exports globais (handlers inline do HTML)
 window.toggleForm = toggleForm;
@@ -2135,6 +2380,7 @@ window.fecharModalAcessoTecnico = fecharModalAcessoTecnico;
 window.validarAcessoTecnico = validarAcessoTecnico;
 
 window.fazerLogout = fazerLogout;
+window.togglePasswordVisibility = togglePasswordVisibility;
 
 window.atualizarTabela = atualizarTabela;
 window.verDetalhes = verDetalhes;
@@ -2163,6 +2409,16 @@ window.abrirModalAjustesPendentes = abrirModalAjustesPendentes;
 window.fecharModalAjustesPendentes = fecharModalAjustesPendentes;
 window.aprovarAjusteModal = aprovarAjusteModal;
 window.reprovarAjusteModal = reprovarAjusteModal;
+window.verDetalhesSolicitacao = verDetalhesSolicitacao;
+window.abrirModalAtribuicaoAjuste = abrirModalAtribuicaoAjuste;
+window.confirmarAprovarAjuste = confirmarAprovarAjuste;
+
+// Funções de ajuste e histórico
+window.abrirModalAjuste = abrirModalAjuste;
+window.fecharModalAjuste = fecharModalAjuste;
+window.confirmarSolicitarAjuste = confirmarSolicitarAjuste;
+window.abrirModalHistorico = abrirModalHistorico;
+window.fecharModalHistorico = fecharModalHistorico;
 
 window.abrirModalRelatorio = abrirModalRelatorio;
 window.fecharModalRelatorio = fecharModalRelatorio;
@@ -2175,17 +2431,13 @@ window.filtrarMinhasSolicitacoes = filtrarMinhasSolicitacoes;
 
 window.toggleTheme = toggleTheme;
 
-
-
-
-
 // Toggle de visibilidade de senha
 function togglePasswordVisibility(inputId, iconId) {
   const input = document.getElementById(inputId);
   const icon = document.getElementById(iconId);
-  
+
   if (!input || !icon) return;
-  
+
   if (input.type === "password") {
     input.type = "text";
     icon.className = "bi bi-eye-slash";
@@ -2195,73 +2447,94 @@ function togglePasswordVisibility(inputId, iconId) {
   }
 }
 
-
 // Máscara para campos de data DD/MM/AAAA
 function aplicarMascaraData(input) {
   if (!input) return;
-  
-  input.addEventListener('input', function(e) {
-    let valor = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
-    
+
+  input.addEventListener("input", function (e) {
+    let valor = e.target.value.replace(/\D/g, ""); // Remove tudo que não é número
+
     // Limita a 8 dígitos (DDMMAAAA)
     if (valor.length > 8) {
       valor = valor.substring(0, 8);
     }
-    
+
     // Aplica a máscara DD/MM/AAAA
     if (valor.length >= 5) {
-      valor = valor.substring(0, 2) + '/' + valor.substring(2, 4) + '/' + valor.substring(4, 8);
+      valor =
+        valor.substring(0, 2) +
+        "/" +
+        valor.substring(2, 4) +
+        "/" +
+        valor.substring(4, 8);
     } else if (valor.length >= 3) {
-      valor = valor.substring(0, 2) + '/' + valor.substring(2, 4);
+      valor = valor.substring(0, 2) + "/" + valor.substring(2, 4);
     }
-    
+
     e.target.value = valor;
   });
-  
+
   // Validação ao sair do campo
-  input.addEventListener('blur', function(e) {
+  input.addEventListener("blur", function (e) {
     const valor = e.target.value;
     if (valor && valor.length === 10) {
-      const partes = valor.split('/');
+      const partes = valor.split("/");
       if (partes.length === 3) {
         const dia = parseInt(partes[0]);
         const mes = parseInt(partes[1]);
         const ano = parseInt(partes[2]);
-        
+
         // Validação básica de ranges
-        if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || ano < 1900 || ano > 2100) {
-          mostrarNotificacao("Data inválida! Use o formato DD/MM/AAAA", "warning");
-          e.target.value = '';
+        if (
+          dia < 1 ||
+          dia > 31 ||
+          mes < 1 ||
+          mes > 12 ||
+          ano < 1900 ||
+          ano > 2100
+        ) {
+          mostrarNotificacao(
+            "Data inválida! Use o formato DD/MM/AAAA",
+            "warning",
+          );
+          e.target.value = "";
           return;
         }
-        
+
         // Validação se a data realmente existe (ex: 31/02 não existe)
-        const dataISO = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-        const dataObj = new Date(dataISO + 'T00:00:00');
-        
+        const dataISO = `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+        const dataObj = new Date(dataISO + "T00:00:00");
+
         // Verificar se a data é válida comparando os valores
-        if (dataObj.getDate() !== dia || dataObj.getMonth() + 1 !== mes || dataObj.getFullYear() !== ano) {
-          mostrarNotificacao("Data inválida! Esta data não existe no calendário.", "warning");
-          e.target.value = '';
+        if (
+          dataObj.getDate() !== dia ||
+          dataObj.getMonth() + 1 !== mes ||
+          dataObj.getFullYear() !== ano
+        ) {
+          mostrarNotificacao(
+            "Data inválida! Esta data não existe no calendário.",
+            "warning",
+          );
+          e.target.value = "";
         }
       }
     }
   });
 }
 
-// Converter data DD/MM/AAAA para AAAA-MM-DD (formato do Firebase)
+// Converter data DD/MM/AAAA para AAAA-MM-DD (formato ISO)
 function converterDataParaISO(dataBR) {
-  if (!dataBR || dataBR.length !== 10) return '';
-  const partes = dataBR.split('/');
-  if (partes.length !== 3) return '';
+  if (!dataBR || dataBR.length !== 10) return "";
+  const partes = dataBR.split("/");
+  if (partes.length !== 3) return "";
   return `${partes[2]}-${partes[1]}-${partes[0]}`;
 }
 
 // Converter data AAAA-MM-DD para DD/MM/AAAA
 function converterDataParaBR(dataISO) {
-  if (!dataISO) return '';
-  const partes = dataISO.split('-');
-  if (partes.length !== 3) return '';
+  if (!dataISO) return "";
+  const partes = dataISO.split("-");
+  if (partes.length !== 3) return "";
   return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
 
@@ -2269,11 +2542,11 @@ function converterDataParaBR(dataISO) {
 function abrirSeletorData(inputTextoId, inputNativoId) {
   const inputNativo = document.getElementById(inputNativoId);
   const inputTexto = document.getElementById(inputTextoId);
-  
+
   if (!inputNativo || !inputTexto) {
     return;
   }
-  
+
   // Converter data atual do campo texto para ISO (se houver)
   if (inputTexto.value && inputTexto.value.length === 10) {
     const dataISO = converterDataParaISO(inputTexto.value);
@@ -2281,10 +2554,10 @@ function abrirSeletorData(inputTextoId, inputNativoId) {
       inputNativo.value = dataISO;
     }
   }
-  
+
   // Tentar usar showPicker se disponível
   try {
-    if (typeof inputNativo.showPicker === 'function') {
+    if (typeof inputNativo.showPicker === "function") {
       inputNativo.showPicker();
     } else {
       // Fallback: focar no input
@@ -2301,51 +2574,51 @@ function abrirSeletorData(inputTextoId, inputNativoId) {
 // Inicializar seletores de data em todos os campos
 function inicializarSeletoresData() {
   const campos = [
-    { texto: 'dataSolicitacao', nativo: 'dataSolicitacaoNativo' },
-    { texto: 'dataEntrega', nativo: 'dataEntregaNativo' },
-    { texto: 'relatorioPeriodoInicio', nativo: 'relatorioPeriodoInicioNativo' },
-    { texto: 'relatorioPeriodoFim', nativo: 'relatorioPeriodoFimNativo' },
-    { texto: 'ajustePrazoFinal', nativo: 'ajustePrazoFinalNativo' }
+    { texto: "dataSolicitacao", nativo: "dataSolicitacaoNativo" },
+    { texto: "dataEntrega", nativo: "dataEntregaNativo" },
+    { texto: "relatorioPeriodoInicio", nativo: "relatorioPeriodoInicioNativo" },
+    { texto: "relatorioPeriodoFim", nativo: "relatorioPeriodoFimNativo" },
+    { texto: "ajustePrazoFinal", nativo: "ajustePrazoFinalNativo" },
   ];
-  
-  campos.forEach(campo => {
+
+  campos.forEach((campo) => {
     const inputTexto = document.getElementById(campo.texto);
     if (!inputTexto) return;
-    
+
     const wrapper = inputTexto.parentElement;
-    if (!wrapper || !wrapper.classList.contains('date-input-wrapper')) return;
-    
+    if (!wrapper || !wrapper.classList.contains("date-input-wrapper")) return;
+
     // Verificar se já existe o input nativo
     let inputNativo = document.getElementById(campo.nativo);
-    
+
     if (!inputNativo) {
       // Criar input nativo oculto
-      inputNativo = document.createElement('input');
-      inputNativo.type = 'date';
+      inputNativo = document.createElement("input");
+      inputNativo.type = "date";
       inputNativo.id = campo.nativo;
-      inputNativo.setAttribute('tabindex', '-1');
-      inputNativo.setAttribute('aria-hidden', 'true');
-      
+      inputNativo.setAttribute("tabindex", "-1");
+      inputNativo.setAttribute("aria-hidden", "true");
+
       wrapper.appendChild(inputNativo);
-      
+
       // Quando selecionar uma data no input nativo
-      inputNativo.addEventListener('change', function() {
+      inputNativo.addEventListener("change", function () {
         if (inputNativo.value) {
           inputTexto.value = converterDataParaBR(inputNativo.value);
-          inputTexto.dispatchEvent(new Event('input', { bubbles: true }));
+          inputTexto.dispatchEvent(new Event("input", { bubbles: true }));
         }
       });
     }
-    
+
     // Tornar o ícone clicável
-    const icone = wrapper.querySelector('.calendar-icon');
+    const icone = wrapper.querySelector(".calendar-icon");
     if (icone) {
       // Remover listeners antigos clonando o elemento
       const novoIcone = icone.cloneNode(true);
       icone.parentNode.replaceChild(novoIcone, icone);
-      
+
       // Adicionar novo listener
-      novoIcone.addEventListener('click', (e) => {
+      novoIcone.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         abrirSeletorData(campo.texto, campo.nativo);
@@ -2359,22 +2632,22 @@ function resetarTextareaContador(textareaId, helpTextId = null) {
   const textarea = document.getElementById(textareaId);
   if (textarea) {
     textarea.value = "";
-    textarea.classList.remove('limite-atingido');
-    
+    textarea.classList.remove("limite-atingido");
+
     // Tentar encontrar o help text
     let helpText = helpTextId ? document.getElementById(helpTextId) : null;
     if (!helpText) {
       helpText = textarea.nextElementSibling;
-      if (helpText && !helpText.classList.contains('help')) {
-        helpText = textarea.parentElement.querySelector('.help');
+      if (helpText && !helpText.classList.contains("help")) {
+        helpText = textarea.parentElement.querySelector(".help");
       }
     }
-    
+
     if (helpText) {
-      helpText.classList.remove('limite-atingido');
-      const charCounter = helpText.querySelector('.char-count');
+      helpText.classList.remove("limite-atingido");
+      const charCounter = helpText.querySelector(".char-count");
       if (charCounter) {
-        charCounter.textContent = '0';
+        charCounter.textContent = "0";
       }
     }
   }
@@ -2382,76 +2655,84 @@ function resetarTextareaContador(textareaId, helpTextId = null) {
 
 // Validar limite de caracteres em textareas
 function validarLimiteTextareas() {
-  const textareas = document.querySelectorAll('textarea[maxlength]');
-  
-  textareas.forEach(textarea => {
-    const maxLength = parseInt(textarea.getAttribute('maxlength'));
-    
+  const textareas = document.querySelectorAll("textarea[maxlength]");
+
+  textareas.forEach((textarea) => {
+    const maxLength = parseInt(textarea.getAttribute("maxlength"));
+
     // Encontrar o elemento de ajuda (help text) associado
     let helpText = textarea.nextElementSibling;
-    if (helpText && !helpText.classList.contains('help')) {
-      helpText = textarea.parentElement.querySelector('.help');
+    if (helpText && !helpText.classList.contains("help")) {
+      helpText = textarea.parentElement.querySelector(".help");
     }
-    
+
     // Encontrar o contador de caracteres
-    const charCounter = helpText?.querySelector('.char-count');
-    
+    const charCounter = helpText?.querySelector(".char-count");
+
     // Função para verificar e aplicar feedback visual
     const verificarLimite = () => {
       const currentLength = textarea.value.length;
       const atingiuLimite = currentLength >= maxLength;
-      
+
       // Atualizar contador
       if (charCounter) {
         charCounter.textContent = currentLength;
       }
-      
+
       // Aplicar feedback visual
       if (atingiuLimite) {
-        textarea.classList.add('limite-atingido');
+        textarea.classList.add("limite-atingido");
         if (helpText) {
-          helpText.classList.add('limite-atingido');
+          helpText.classList.add("limite-atingido");
         }
       } else {
-        textarea.classList.remove('limite-atingido');
+        textarea.classList.remove("limite-atingido");
         if (helpText) {
-          helpText.classList.remove('limite-atingido');
+          helpText.classList.remove("limite-atingido");
         }
       }
     };
-    
+
     // Validar ao colar
-    textarea.addEventListener('paste', function(e) {
+    textarea.addEventListener("paste", function (e) {
       setTimeout(() => {
         if (this.value.length > maxLength) {
           this.value = this.value.substring(0, maxLength);
-          mostrarNotificacao('TEXTO MUITO GRANDE, LIMITE DE 1000 CARACTERES', 'warning');
+          mostrarNotificacao(
+            "TEXTO MUITO GRANDE, LIMITE DE 1000 CARACTERES",
+            "warning",
+          );
         }
         verificarLimite();
       }, 10);
     });
-    
+
     // Validar ao digitar
-    textarea.addEventListener('input', function() {
+    textarea.addEventListener("input", function () {
       if (this.value.length > maxLength) {
         this.value = this.value.substring(0, maxLength);
-        mostrarNotificacao('TEXTO MUITO GRANDE, LIMITE DE 1000 CARACTERES', 'warning');
+        mostrarNotificacao(
+          "TEXTO MUITO GRANDE, LIMITE DE 1000 CARACTERES",
+          "warning",
+        );
       }
       verificarLimite();
     });
-    
+
     // Remover feedback visual ao começar a apagar
-    textarea.addEventListener('keydown', function(e) {
-      if ((e.key === 'Backspace' || e.key === 'Delete') && this.value.length >= maxLength) {
+    textarea.addEventListener("keydown", function (e) {
+      if (
+        (e.key === "Backspace" || e.key === "Delete") &&
+        this.value.length >= maxLength
+      ) {
         setTimeout(() => verificarLimite(), 10);
       }
     });
-    
+
     // Verificar limite inicial (caso já tenha conteúdo)
     verificarLimite();
   });
 }
-
 
 // Sistema de Notificações de Ajustes
 async function atualizarContadorAjustesPendentes() {
@@ -2464,20 +2745,22 @@ async function atualizarContadorAjustesPendentes() {
   try {
     // Buscar todos os ajustes pendentes de todas as solicitações
     let totalPendentes = 0;
-    
+
     for (const solicitacao of solicitacoes) {
-      const ajustes = await window.versioningModule.obterAjustesPendentes(solicitacao.id);
-      const pendentes = ajustes.filter(a => a.status === 'aguardando_aprovacao');
+      const ajustes = await obterAjustesPendentes(solicitacao.id);
+      const pendentes = ajustes.filter(
+        (a) => a.status === "aguardando_aprovacao",
+      );
       totalPendentes += pendentes.length;
     }
 
     const notifDiv = document.getElementById("notificacoesAjustes");
     const badge = document.getElementById("badgeAjustesPendentes");
-    
+
     if (notifDiv) {
       notifDiv.style.display = "block";
     }
-    
+
     if (badge) {
       if (totalPendentes > 0) {
         badge.textContent = totalPendentes;
@@ -2491,16 +2774,104 @@ async function atualizarContadorAjustesPendentes() {
   }
 }
 
+// ============================================
+// MODAL DE SOLICITAR AJUSTE
+// ============================================
+let solicitacaoAjusteAtual = null;
+
+function abrirModalAjuste(idSolicitacao) {
+  solicitacaoAjusteAtual = idSolicitacao;
+  const modal = document.getElementById("modalAjuste");
+  if (modal) {
+    // Limpar formulário
+    document.getElementById("ajusteTipoAjuste").value = "";
+    document.getElementById("ajusteObservacoes").value = "";
+    document.getElementById("ajusteDiretorioReferencia").value = "";
+    document.getElementById("ajusteDiretorioSalvamento").value = "";
+    document.getElementById("ajustePrazoFinal").value = "";
+
+    modal.classList.add("active");
+  }
+}
+
+function fecharModalAjuste() {
+  const modal = document.getElementById("modalAjuste");
+  if (modal) {
+    modal.classList.remove("active");
+  }
+  solicitacaoAjusteAtual = null;
+}
+
+async function confirmarSolicitarAjuste() {
+  if (!solicitacaoAjusteAtual) {
+    mostrarNotificacao("Erro: Solicitação não identificada", "error");
+    return;
+  }
+
+  const solicitadoPor = document
+    .getElementById("ajusteNomeSolicitante")
+    .value.trim();
+  const tipoAjuste = document.getElementById("ajusteTipoAjuste").value.trim();
+  const observacoes = document.getElementById("ajusteObservacoes").value.trim();
+  const diretorioReferencia = document
+    .getElementById("ajusteDiretorioReferencia")
+    .value.trim();
+  const diretorioSalvamento = document
+    .getElementById("ajusteDiretorioSalvamento")
+    .value.trim();
+  const prazoFinal = document.getElementById("ajustePrazoFinal").value.trim();
+
+  if (!solicitadoPor) {
+    mostrarNotificacao("Por favor, informe seu nome", "warning");
+    document.getElementById("ajusteNomeSolicitante").focus();
+    return;
+  }
+
+  if (!observacoes) {
+    mostrarNotificacao("Por favor, descreva o ajuste necessário", "warning");
+    return;
+  }
+
+  try {
+    mostrarLoader("Solicitando ajuste...");
+
+    const dadosAjuste = {
+      solicitadoPor,
+      tipoAjuste,
+      observacoes,
+      diretorioReferencia,
+      diretorioSalvamento,
+      prazoFinal: prazoFinal ? converterDataParaISO(prazoFinal) : null,
+    };
+
+    await solicitarAjuste(solicitacaoAjusteAtual, dadosAjuste, null);
+
+    mostrarNotificacao("Ajuste solicitado com sucesso!", "success");
+    fecharModalAjuste();
+    esconderLoader();
+
+    // Atualizar contador de ajustes pendentes imediatamente
+    await atualizarContadorAjustesPendentes();
+  } catch (erro) {
+    console.error("Erro ao solicitar ajuste:", erro);
+    mostrarNotificacao("Erro ao solicitar ajuste: " + erro.message, "error");
+    esconderLoader();
+  }
+}
+
 // Abre modal com ajustes pendentes
 async function abrirModalAjustesPendentes() {
   if (!acessoGestor) {
-    mostrarNotificacao("Apenas gestores podem ver ajustes pendentes!", "warning");
+    mostrarNotificacao(
+      "Apenas gestores podem ver ajustes pendentes!",
+      "warning",
+    );
     return;
   }
 
   const modal = document.getElementById("modalAjustesPendentes");
   const conteudo = document.getElementById("conteudoAjustesPendentes");
-  
+
   if (!modal || !conteudo) return;
 
   try {
@@ -2511,20 +2882,22 @@ async function abrirModalAjustesPendentes() {
         <p style="margin-top: 16px; color: var(--muted);">Carregando ajustes pendentes...</p>
       </div>
     `;
-    
+
     modal.classList.add("active");
 
     // Buscar todos os ajustes pendentes
     const ajustesPorSolicitacao = [];
-    
+
     for (const solicitacao of solicitacoes) {
-      const ajustes = await window.versioningModule.obterAjustesPendentes(solicitacao.id);
-      const pendentes = ajustes.filter(a => a.status === 'aguardando_aprovacao');
-      
+      const ajustes = await obterAjustesPendentes(solicitacao.id);
+      const pendentes = ajustes.filter(
+        (a) => a.status === "aguardando_aprovacao",
+      );
+
       if (pendentes.length > 0) {
         ajustesPorSolicitacao.push({
           solicitacao,
-          ajustes: pendentes
+          ajustes: pendentes,
         });
       }
     }
@@ -2555,7 +2928,7 @@ async function abrirModalAjustesPendentes() {
     `;
 
     ajustesPorSolicitacao.forEach(({ solicitacao, ajustes }) => {
-      ajustes.forEach(ajuste => {
+      ajustes.forEach((ajuste) => {
         html += `
           <div class="ajuste-pendente-card">
             <div class="ajuste-pendente-header">
@@ -2564,16 +2937,12 @@ async function abrirModalAjustesPendentes() {
                   Solicitação #${String(solicitacao.id).padStart(4, "0")}
                 </div>
                 <div style="color: var(--text); font-size: 0.9rem; margin-top: 4px;">
-                  ${escapeHtml(solicitacao.nomeEstudo || "Sem nome")} - ${escapeHtml(solicitacao.cliente || "")}
+                  ${escapeHtml(solicitacao.nomeEstudo || solicitacao.cliente || "Sem informações")}
                 </div>
                 <div class="ajuste-pendente-meta">
                   <span style="display: flex; align-items: center; gap: 6px;">
-                    <i class="bi bi-person"></i>
-                    ${escapeHtml(ajuste.solicitadoPor)}
-                  </span>
-                  <span style="display: flex; align-items: center; gap: 6px;">
                     <i class="bi bi-calendar"></i>
-                    ${new Date(ajuste.dataSolicitacao).toLocaleString('pt-BR')}
+                    ${new Date(ajuste.created_at).toLocaleString("pt-BR")}
                   </span>
                 </div>
               </div>
@@ -2583,53 +2952,93 @@ async function abrirModalAjustesPendentes() {
             </div>
 
             <div class="ajuste-pendente-content">
-              ${ajuste.tipoAjuste ? `
+              ${
+                ajuste.dados?.tipoAjuste
+                  ? `
               <div class="ajuste-pendente-field">
                 <div class="ajuste-pendente-field-label">Tipo de Ajuste</div>
-                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.tipoAjuste)}</div>
+                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.dados.tipoAjuste)}</div>
               </div>
-              ` : ''}
+              `
+                  : ""
+              }
 
-              ${ajuste.observacoes ? `
+              ${
+                ajuste.dados?.observacoes
+                  ? `
               <div class="ajuste-pendente-field">
                 <div class="ajuste-pendente-field-label">Observações</div>
-                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.observacoes)}</div>
+                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.dados.observacoes)}</div>
               </div>
-              ` : ''}
+              `
+                  : ""
+              }
 
-              ${ajuste.diretorioReferencia ? `
+              ${
+                ajuste.dados?.diretorioReferencia
+                  ? `
               <div class="ajuste-pendente-field">
                 <div class="ajuste-pendente-field-label">Diretório de Referência</div>
-                <div class="ajuste-pendente-field-value" style="font-family: monospace; font-size: 0.85rem;">
-                  ${escapeHtml(ajuste.diretorioReferencia)}
-                </div>
+                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.dados.diretorioReferencia)}</div>
               </div>
-              ` : ''}
+              `
+                  : ""
+              }
 
-              ${ajuste.diretorioSalvamento ? `
+              ${
+                ajuste.dados?.diretorioSalvamento
+                  ? `
               <div class="ajuste-pendente-field">
                 <div class="ajuste-pendente-field-label">Diretório de Salvamento</div>
-                <div class="ajuste-pendente-field-value" style="font-family: monospace; font-size: 0.85rem;">
-                  ${escapeHtml(ajuste.diretorioSalvamento)}
-                </div>
+                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.dados.diretorioSalvamento)}</div>
               </div>
-              ` : ''}
+              `
+                  : ""
+              }
 
-              ${ajuste.prazoFinal ? `
+              ${
+                ajuste.prazo_final
+                  ? `
               <div class="ajuste-pendente-field">
                 <div class="ajuste-pendente-field-label">Novo Prazo Final</div>
                 <div class="ajuste-pendente-field-value">
-                  ${formatDateBR(ajuste.prazoFinal)}
+                  ${formatDateBR(ajuste.prazo_final)}
                 </div>
               </div>
-              ` : ''}
+              `
+                  : ""
+              }
+
+              ${
+                ajuste.dados?.solicitadoPor
+                  ? `
+              <div class="ajuste-pendente-field">
+                <div class="ajuste-pendente-field-label">Solicitado por</div>
+                <div class="ajuste-pendente-field-value">${escapeHtml(ajuste.dados.solicitadoPor)}</div>
+              </div>
+              `
+                  : ""
+              }
+
+              ${
+                ajuste.dados?.dataSolicitacao
+                  ? `
+              <div class="ajuste-pendente-field">
+                <div class="ajuste-pendente-field-label">Data da Solicitação</div>
+                <div class="ajuste-pendente-field-value">
+                  ${new Date(ajuste.dados.dataSolicitacao).toLocaleString("pt-BR")}
+                </div>
+              </div>
+              `
+                  : ""
+              }
             </div>
 
             <div class="ajuste-pendente-actions">
-              <button class="btn btn-success" type="button" onclick="aprovarAjusteModal(${solicitacao.id}, '${ajuste.id}')">
+              <button class="btn btn-success" type="button" onclick="aprovarAjusteModal(${solicitacao.id}, ${ajuste.id})">
                 <i class="bi bi-check-circle"></i> Aprovar
               </button>
-              <button class="btn btn-danger" type="button" onclick="reprovarAjusteModal(${solicitacao.id}, '${ajuste.id}')">
+              <button class="btn btn-danger" type="button" onclick="reprovarAjusteModal(${solicitacao.id}, ${ajuste.id})">
                 <i class="bi bi-x-circle"></i> Reprovar
               </button>
               <button class="btn btn-info" type="button" onclick="verDetalhesSolicitacao(${solicitacao.id})">
@@ -2678,6 +3087,90 @@ function verDetalhesSolicitacao(idSolicitacao) {
   setTimeout(() => verDetalhes(idSolicitacao), 300);
 }
 
+// Abrir modal de atribuição para ajuste
+function abrirModalAtribuicaoAjuste(idSolicitacao, idAjuste) {
+  if (!acessoGestor) {
+    mostrarNotificacao("Apenas gestores podem aprovar ajustes!", "warning");
+    return;
+  }
+
+  const solicitacao = solicitacoes.find((s) => s.id == idSolicitacao);
+  if (!solicitacao || !conteudoAtribuicao) return;
+
+  conteudoAtribuicao.innerHTML = `
+    <div class="form-group">
+      <p><strong>Aprovar Ajuste - Solicitação #${idSolicitacao}</strong></p>
+      <p>Estudo: ${escapeHtml(solicitacao.nomeEstudo || "Não informado")}</p>
+      <p>Cliente: ${escapeHtml(solicitacao.cliente || "")}</p>
+    </div>
+
+    <div class="form-group" style="margin-top: 12px;">
+      <label for="selectTecnicoAjuste">Atribuir ao Técnico *</label>
+      <select id="selectTecnicoAjuste" required>
+        <option value="" disabled selected>Selecione um técnico...</option>
+        <option value="LAIS">Laís Mendes</option>
+        <option value="LAIZE">Laize Rodrigues</option>
+        <option value="VALESKA">Valeska Soares</option>
+        <option value="LIZABETH">Lizabeth Silva</option>
+        <option value="ISMAEL">Ismael Alves</option>
+        <option value="FERNANDO">Fernando Sousa</option>
+      </select>
+    </div>
+
+    <div class="btn-group justify-end" style="margin-top: 16px;">
+      <button class="btn btn-ghost" type="button" onclick="fecharModalAtribuicao()">Cancelar</button>
+      <button class="btn btn-success" type="button" onclick="confirmarAprovarAjuste(${idSolicitacao}, ${idAjuste})">
+        <i class="bi bi-check-circle"></i> Aprovar e Atribuir
+      </button>
+    </div>
+  `;
+
+  modalAtribuicao?.classList.add("active");
+  modalAtribuicao.dataset.solicitacaoId = idSolicitacao;
+
+  // Focar no select após abrir
+  setTimeout(() => {
+    document.getElementById("selectTecnicoAjuste")?.focus();
+  }, 100);
+}
+
+// Confirmar aprovação do ajuste
+async function confirmarAprovarAjuste(idSolicitacao, idAjuste) {
+  const tecnico = document.getElementById("selectTecnicoAjuste")?.value;
+
+  if (!tecnico) {
+    mostrarNotificacao("Selecione um técnico!", "warning");
+    return;
+  }
+
+  try {
+    mostrarLoader("Aprovando ajuste...");
+
+    // Converter IDs para número
+    const solicitacaoId = Number(idSolicitacao);
+    const ajusteId = Number(idAjuste);
+
+    await aprovarAjustePendente(solicitacaoId, ajusteId, "Gestor", tecnico);
+
+    mostrarNotificacao("Ajuste aprovado com sucesso!", "success");
+    fecharModalAtribuicao();
+    esconderLoader();
+
+    // Atualizar contador
+    await atualizarContadorAjustesPendentes();
+
+    // Recarregar solicitações
+    await carregarSolicitacoes();
+
+    // Reabrir modal de ajustes pendentes após 500ms
+    setTimeout(() => abrirModalAjustesPendentes(), 500);
+  } catch (error) {
+    console.error("Erro ao aprovar ajuste:", error);
+    mostrarNotificacao("Erro ao aprovar ajuste: " + error.message, "error");
+    esconderLoader();
+  }
+}
+
 // Aprovar ajuste do modal de notificações
 async function aprovarAjusteModal(idSolicitacao, idAjuste) {
   if (!acessoGestor) {
@@ -2687,7 +3180,7 @@ async function aprovarAjusteModal(idSolicitacao, idAjuste) {
 
   // Fechar modal de ajustes pendentes
   fecharModalAjustesPendentes();
-  
+
   // Abrir modal de atribuição
   setTimeout(() => {
     window.abrirModalAtribuicaoAjuste(idSolicitacao, idAjuste);
@@ -2705,11 +3198,11 @@ async function reprovarAjusteModal(idSolicitacao, idAjuste) {
 
   // Guardar IDs para usar na confirmação
   ajusteParaReprovar = { idSolicitacao, idAjuste };
-  
+
   // Limpar campo de motivo
   const motivoInput = document.getElementById("motivoReprovacao");
   if (motivoInput) motivoInput.value = "";
-  
+
   // Abrir modal de confirmação
   const modal = document.getElementById("modalConfirmarReprovacao");
   if (modal) {
@@ -2722,17 +3215,17 @@ function fecharModalConfirmarReprovacao() {
   const modal = document.getElementById("modalConfirmarReprovacao");
   if (modal) modal.style.display = "none";
   ajusteParaReprovar = null;
-  
+
   // Resetar textarea de motivo
   resetarTextareaContador("motivoReprovacao", "helpMotivoReprovacao");
 }
 
 async function confirmarReprovacaoAjuste() {
   if (!ajusteParaReprovar) return;
-  
+
   const motivoInput = document.getElementById("motivoReprovacao");
   const motivo = motivoInput?.value?.trim();
-  
+
   if (!motivo) {
     mostrarNotificacao("O motivo da reprovação é obrigatório!", "warning");
     motivoInput?.focus();
@@ -2740,116 +3233,20 @@ async function confirmarReprovacaoAjuste() {
   }
 
   try {
-    await window.versioningModule.reprovarAjustePendente(
-      ajusteParaReprovar.idSolicitacao,
-      ajusteParaReprovar.idAjuste,
-      "Gestor",
-      motivo
-    );
+    // Converter IDs para número
+    const solicitacaoId = Number(ajusteParaReprovar.idSolicitacao);
+    const ajusteId = Number(ajusteParaReprovar.idAjuste);
+
+    await reprovarAjustePendente(solicitacaoId, ajusteId, "Gestor", motivo);
 
     mostrarNotificacao("Ajuste reprovado com sucesso!", "warning");
-    
+
     // Fechar modal
     fecharModalConfirmarReprovacao();
-    
+
     // Atualizar contador
     await atualizarContadorAjustesPendentes();
-    
-    // Reabrir modal de ajustes pendentes
-    setTimeout(() => abrirModalAjustesPendentes(), 500);
-  } catch (error) {
-    console.error("Erro ao reprovar ajuste:", error);
-    mostrarNotificacao("Erro ao reprovar ajuste: " + error.message, "error");
-  }
-}
 
-// Atualizar contador quando carregar solicitações
-const carregarSolicitacoesOriginal = carregarSolicitacoesFirebase;
-carregarSolicitacoesFirebase = function() {
-  carregarSolicitacoesOriginal();
-  
-  // Atualizar contador após carregar solicitações
-  setTimeout(() => {
-    if (acessoGestor) {
-      atualizarContadorAjustesPendentes();
-    }
-  }, 1000);
-};
-
-
-// Abrir modal customizado para confirmar reprovação
-function abrirModalConfirmacaoReprovar(idSolicitacao, idAjuste) {
-  const modal = document.getElementById("modalConfirmacao");
-  const conteudo = document.getElementById("conteudoConfirmacao");
-  
-  if (!modal || !conteudo) return;
-
-  conteudo.innerHTML = `
-    <div style="text-align: center; padding: 20px 0;">
-      <i class="bi bi-exclamation-triangle" style="font-size: 4rem; color: var(--danger);"></i>
-      <h3 style="margin-top: 16px; color: var(--text);">Reprovar Ajuste</h3>
-      <p style="margin-top: 12px; color: var(--muted); line-height: 1.6;">
-        Tem certeza que deseja <strong style="color: var(--danger);">REPROVAR</strong> este ajuste?
-      </p>
-      <p style="margin-top: 8px; color: var(--warning); font-weight: 600;">
-        ⚠️ Esta ação é PERMANENTE e não pode ser desfeita!
-      </p>
-    </div>
-
-    <div class="form-group" style="margin-top: 20px;">
-      <label for="motivoReprovacao">Motivo da Reprovação *</label>
-      <textarea 
-        id="motivoReprovacao" 
-        rows="4" 
-        placeholder="Digite o motivo da reprovação..." 
-        required
-        style="width: 100%;"
-      ></textarea>
-      <small class="help">Obrigatório - Explique o motivo para o solicitante</small>
-    </div>
-
-    <div class="btn-group" style="margin-top: 20px;">
-      <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmacao()">
-        <i class="bi bi-x-circle"></i> Cancelar
-      </button>
-      <button class="btn btn-danger" type="button" onclick="confirmarReprovarAjuste(${idSolicitacao}, '${idAjuste}')">
-        <i class="bi bi-x-circle-fill"></i> Confirmar Reprovação
-      </button>
-    </div>
-  `;
-
-  modal.classList.add("active");
-  
-  // Focar no textarea
-  setTimeout(() => {
-    document.getElementById("motivoReprovacao")?.focus();
-  }, 100);
-}
-
-// Confirmar reprovação do ajuste
-async function confirmarReprovarAjuste(idSolicitacao, idAjuste) {
-  const motivo = document.getElementById("motivoReprovacao")?.value.trim();
-  
-  if (!motivo) {
-    mostrarNotificacao("Digite o motivo da reprovação!", "warning");
-    return;
-  }
-
-  try {
-    await window.versioningModule.reprovarAjustePendente(
-      idSolicitacao,
-      idAjuste,
-      "Gestor",
-      motivo
-    );
-
-    mostrarNotificacao("Ajuste reprovado com sucesso!", "warning");
-    
-    fecharModalConfirmacao();
-    
-    // Atualizar contador
-    await atualizarContadorAjustesPendentes();
-    
     // Reabrir modal de ajustes pendentes
     setTimeout(() => abrirModalAjustesPendentes(), 500);
   } catch (error) {

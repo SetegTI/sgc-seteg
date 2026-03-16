@@ -1,0 +1,827 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SGC Seteg - Sistema de Gestão Cartográfica</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/assets/images/favicon.png" />
+
+    <!-- Fonte Satoshi -->
+    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@900,700,500,400,300&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+    <!-- Prevenir FOUC (Flash of Unstyled Content) -->
+    <style>
+        /* Loader inicial - inline para carregar antes de tudo */
+        #initial-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #050816;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        #initial-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(37, 99, 235, 0.2);
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            color: #e5e7eb;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        /* Ocultar conteúdo até carregar */
+        body:not(.loaded) .container {
+            opacity: 0;
+        }
+
+        body.loaded .container {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loader Inicial -->
+    <div id="initial-loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Carregando solicitações...</div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="brand">
+                        <img id="logoSeteg" class="brand-logo" alt="Logo SETEG" />
+                        <div class="brand-text">
+                            <h1>Sistema de Solicitação Cartográfica</h1>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-right" id="headerButtons">
+                    <!-- Theme Toggle -->
+                    <div class="theme-toggle" id="themeToggle" title="Alternar tema">
+                        <div class="theme-toggle-slider">
+                            <i class="bi bi-moon-fill"></i>
+                        </div>
+                    </div>
+
+                    <!-- Notificações de Ajustes Pendentes (apenas para gestor) -->
+                    <div id="notificacoesAjustes" style="display: none; position: relative; overflow: visible;">
+                        <button class="btn btn-ghost" type="button" onclick="abrirModalAjustesPendentes()"
+                            title="Ajustes pendentes de aprovação" style="position: relative; overflow: visible;">
+                            <i class="bi bi-bell" style="font-size: 1.2rem;"></i>
+                            <span id="badgeAjustesPendentes" class="notification-badge" style="display: none;">0</span>
+                        </button>
+                    </div>
+
+                    <!-- Indicador de Login -->
+                    <div id="loginIndicator"
+                        style="display: none; align-items: center; gap: 12px; padding: 8px 16px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px;">
+                        <i class="bi bi-check-circle-fill" style="color: #22c55e; font-size: 1.1rem;"></i>
+                        <span id="loginText" style="font-weight: 500; font-size: 0.9rem;"></span>
+                        <button class="btn btn-ghost" type="button" onclick="fazerLogout()"
+                            style="padding: 6px 12px; font-size: 0.85rem;">
+                            <i class="bi bi-box-arrow-right"></i> Sair
+                        </button>
+                    </div>
+
+                    <button class="btn btn-ghost" type="button" id="btnAcessoGestor">
+                        <i class="bi bi-shield-lock"></i> Acesso Gestor
+                    </button>
+                    <button class="btn btn-primary" type="button" id="btnAcessoTecnico">
+                        <i class="bi bi-person-circle"></i> Acesso Técnico
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard" id="appMain">
+            <!-- Conteúdo principal -->
+            <section class="main-content" aria-label="Conteúdo principal">
+                <!-- Nova solicitação -->
+                <div class="card" id="cardNovaSolicitacao">
+                    <div class="card-header">
+                        <h2 class="card-title">Nova Solicitação Cartográfica</h2>
+                        <button class="btn btn-primary" type="button" id="btnToggleForm">
+                            <i class="bi bi-file-earmark-plus"></i> Nova Solicitação
+                        </button>
+                    </div>
+
+                    <div id="formSection" class="form-section" aria-hidden="false">
+                        <form id="solicitacaoForm">
+                            <div class="section-title"><i class="bi bi-clipboard-data"></i> Dados do Solicitante</div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label for="solicitante">Solicitante *</label>
+                                    <input type="text" id="solicitante" name="solicitante" placeholder="Nome completo"
+                                        required />
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="dataSolicitacao">Data da Solicitação *</label>
+                                    <div class="date-input-wrapper">
+                                        <input type="text" id="dataSolicitacao" name="dataSolicitacao"
+                                            placeholder="DD/MM/AAAA" maxlength="10" required />
+                                        <span class="calendar-icon">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                viewBox="0 0 16 16">
+                                                <path
+                                                    d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label for="cliente">Cliente - Código *</label>
+                                    <input type="text" id="cliente" name="cliente"
+                                        placeholder="Nome do cliente e código da empresa" required />
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="dataEntrega">Data de Entrega *</label>
+                                    <div class="date-input-wrapper">
+                                        <input type="text" id="dataEntrega" name="dataEntrega" placeholder="DD/MM/AAAA"
+                                            maxlength="10" required />
+                                        <span class="calendar-icon">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                viewBox="0 0 16 16">
+                                                <path
+                                                    d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="section-title"><i class="bi bi-map"></i> Dados Técnicos do Mapa</div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label for="nomeEstudo">Nome do Estudo *</label>
+                                    <input type="text" id="nomeEstudo" name="nomeEstudo"
+                                        placeholder="Ex: Estudo de Fauna - Área X" required />
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="empreendimento">Empreendimento</label>
+                                    <input type="text" id="empreendimento" name="empreendimento"
+                                        placeholder="Nome do empreendimento" />
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label for="localidade">Localidade / Bairro / Lugar *</label>
+                                    <input type="text" id="localidade" name="localidade"
+                                        placeholder="Localização da área" required />
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="municipio">Município / Estado</label>
+                                    <input type="text" id="municipio" name="municipio" placeholder="Ex: Palmeira/PR" />
+                                    <small class="help">Campo opcional</small>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label for="diretorioArquivos">Diretório dos Arquivos de Referência *</label>
+                                    <input type="text" id="diretorioArquivos" name="diretorioArquivos"
+                                        placeholder="Ex: Z:\Mapas\Base\Cliente_X" required />
+                                    <small class="help">Local onde estão salvos os arquivos base para elaboração</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="diretorioSalvamento">Diretório para Salvamento dos Mapas *</label>
+                                    <input type="text" id="diretorioSalvamento" name="diretorioSalvamento"
+                                        placeholder="Ex: Z:\Mapas\Elaborados\Cliente_X" required />
+                                    <small class="help">Local onde os mapas elaborados serão salvos</small>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label for="tipoMapa">Tipo de Mapa *</label>
+                                    <select id="tipoMapa" name="tipoMapa" required>
+                                        <option value="" disabled selected>Selecione...</option>
+                                        <option value="TOPOGRAFICO">Topográfico</option>
+                                        <option value="GEOLOGICO">Geológico</option>
+                                        <option value="PEDOLOGICO">Pedológico</option>
+                                        <option value="HIDROGRAFICO">Hidrográfico</option>
+                                        <option value="VEGETACAO">Vegetação</option>
+                                        <option value="FAUNA">Fauna</option>
+                                        <option value="FLORA">Flora</option>
+                                        <option value="PLANTA_GEORREFERENCIADA">Planta Georreferenciada</option>
+                                        <option value="USO_SOLO">Uso do Solo</option>
+                                        <option value="GEOMORFOLOGICO">Geomorfológico</option>
+                                        <option value="LOCALIZACAO">Localização</option>
+                                        <option value="OUTROS">Outros</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group" id="tipoMapaOutros" style="display: none;">
+                                    <label for="tipoMapaOutrosTexto">Especifique o Tipo de Mapa *</label>
+                                    <input type="text" id="tipoMapaOutrosTexto" name="tipoMapaOutrosTexto"
+                                        placeholder="Digite o nome do mapa" />
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label>É necessário solicitar ART? *</label>
+                                    <div class="radio-row">
+                                        <label class="radio-item">
+                                            <input type="radio" name="artNecessaria" value="sim" required />
+                                            Sim
+                                        </label>
+                                        <label class="radio-item">
+                                            <input type="radio" name="artNecessaria" value="nao" required />
+                                            Não
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group" id="artResponsavelContainer" style="display: none;">
+                                    <label for="artResponsavel">Nome do Responsável Técnico *</label>
+                                    <input type="text" id="artResponsavel" name="artResponsavel"
+                                        placeholder="Digite o nome completo do responsável" />
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group">
+                                    <label for="finalidade">Finalidade *</label>
+                                    <select id="finalidade" name="finalidade" required>
+                                        <option value="" disabled selected>Selecione...</option>
+                                        <option value="LICENCIAMENTO">Licenciamento Ambiental</option>
+                                        <option value="ESTUDO_IMPACTO">Estudo de Impacto Ambiental</option>
+                                        <option value="PRE_CAMPO">Pré-Campo</option>
+                                        <option value="POS_CAMPO">Pós-Campo</option>
+                                        <option value="PLANEJAMENTO">Planejamento Territorial</option>
+                                        <option value="OUTROS">Outros</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="observacoes">Observações / Requisitos Especiais</label>
+                                    <textarea id="observacoes" name="observacoes" maxlength="1000"
+                                        placeholder="Descreva requisitos adicionais, informações importantes, prazos específicos, etc."></textarea>
+                                    <small class="help" id="helpObservacoes">
+                                        <span class="char-counter"><span class="char-count">0</span>/1000
+                                            caracteres</span>
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="section-title"><i class="bi bi-box-seam"></i> Produtos Solicitados</div>
+
+                            <div class="form-group">
+                                <label>Produtos:</label>
+                                <div class="checkbox-group">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="produtoMapa" name="produtoMapa" checked />
+                                        <label for="produtoMapa">Mapa / Planta</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="produtoCroqui" name="produtoCroqui" />
+                                        <label for="produtoCroqui">Croqui</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="produtoShapefile" name="produtoShapefile" />
+                                        <label for="produtoShapefile">Shapefile (SHP)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="produtoKML" name="produtoKML" />
+                                        <label for="produtoKML">KMZ/KML</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="section-title"><i class="bi bi-pencil-square"></i> Croquis</div>
+
+                            <div class="form-group">
+                                <label>Elementos:</label>
+                                <div class="checkbox-group">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="elementoLocalizacao" name="elementoLocalizacao" />
+                                        <label for="elementoLocalizacao">Localização</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="elementoAcessoLocal" name="elementoAcessoLocal" />
+                                        <label for="elementoAcessoLocal">Via de Acesso Local</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="elementoAcessoRegional"
+                                            name="elementoAcessoRegional" />
+                                        <label for="elementoAcessoRegional">Via de Acesso Regional</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="elementoAreaAmostral" name="elementoAreaAmostral" />
+                                        <label for="elementoAreaAmostral">Área Amostral</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="elementoOutros" name="elementoOutros"
+                                            onclick="toggleElementosOutros()" />
+                                        <label for="elementoOutros">Outros</label>
+                                    </div>
+                                </div>
+
+                                <div id="campoElementosOutros" style="display: none; margin-top: 10px;">
+                                    <textarea id="elementoOutrosTexto" name="elementoOutrosTexto"
+                                        placeholder="Especifique outros elementos" rows="3" maxlength="500"
+                                        style="width: 100%; resize: vertical;"></textarea>
+                                    <div class="help">
+                                        <span class="char-count">0</span>/500 caracteres
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="btn-group justify-end">
+                                <button type="button" class="btn btn-ghost" id="btnLimparForm">
+                                    <i class="bi bi-arrow-clockwise"></i> Limpar Formulário
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle"></i> Salvar Solicitação
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Lista -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title" id="tituloSolicitacoes">Todas as Solicitações</h2>
+                        <div class="tabs" role="tablist" aria-label="Filtros por status">
+                            <button class="tab-btn active" data-tab="todas" type="button" role="tab">Todas</button>
+                            <button class="tab-btn" data-tab="fila" type="button" role="tab">Na Fila</button>
+                            <button class="tab-btn" data-tab="em_andamento" type="button" role="tab">Em
+                                Andamento</button>
+                            <button class="tab-btn" data-tab="ajustes_pendentes" type="button" role="tab">Ajustes
+                                Pendentes</button>
+                            <button class="tab-btn" data-tab="concluido" type="button" role="tab">Concluídas</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="tabelaSolicitacoes">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Solicitante</th>
+                                    <th>Estudo</th>
+                                    <th>Cliente</th>
+                                    <th>Tipo</th>
+                                    <th>Município</th>
+                                    <th>Técnico</th>
+                                    <th>Status</th>
+                                    <th>Data</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodySolicitacoes"></tbody>
+                        </table>
+
+                        <div id="emptyState" class="empty-state" aria-live="polite">
+                            <i class="bi bi-inbox empty-icon"></i>
+                            <p>Nenhuma solicitação encontrada</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sidebar -->
+            <aside class="sidebar" aria-label="Painel lateral">
+                <!-- Painel Gestor -->
+                <div id="painelGestor" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="bi bi-clipboard-check"></i> Painel do Gestor</h3>
+                    </div>
+                    <div class="form-group">
+                        <label><strong>Técnicos e Projetos:</strong></label>
+                        <div id="listaTecnicos" class="tecnico-list"></div>
+                    </div>
+                    <div class="btn-group" style="margin-top: 20px;">
+                        <button class="btn btn-success btn-block" type="button" onclick="abrirModalRelatorio()">
+                            <i class="bi bi-bar-chart"></i> Gerar Relatório
+                        </button>
+                        <button class="btn btn-warning btn-block" type="button" onclick="exportarTodosDados()">
+                            <i class="bi bi-download"></i> Exportar CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Painel Técnico -->
+                <div id="painelTecnico" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h3 class="card-title" id="tituloPainelTecnico"><i class="bi bi-person-badge"></i> Painel do
+                            Técnico</h3>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label><strong>Estatísticas:</strong></label>
+                        <div id="estatisticasTecnico"></div>
+                    </div>
+                    <div class="btn-group" style="margin-top: 20px;">
+                        <button class="btn btn-primary btn-block" type="button" onclick="atualizarTabela()">
+                            <i class="bi bi-arrow-clockwise"></i> Atualizar Lista
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <div class="stats-label">Total de Solicitações</div>
+                    <div class="stats-number" id="totalSolicitacoes">0</div>
+                </div>
+
+                <div class="stats-card">
+                    <div class="stats-label">Na Fila</div>
+                    <div class="stats-number" id="totalFila">0</div>
+                </div>
+
+                <div class="stats-card">
+                    <div class="stats-label">Processando</div>
+                    <div class="stats-number" id="totalProcessando">0</div>
+                </div>
+
+                <div class="stats-card">
+                    <div class="stats-label">Finalizadas</div>
+                    <div class="stats-number" id="totalFinalizadas">0</div>
+                </div>
+
+                <div class="card legend-card">
+                    <div class="card-header">
+                        <h3 class="card-title">Legenda de Status</h3>
+                    </div>
+                    <div class="legend-content">
+                        <div class="legend-item">
+                            <span class="status-badge status-fila">Na Fila</span>
+                            <span>Aguardando atribuição</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="status-badge status-processando">Em Andamento</span>
+                            <span>Em produção</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="status-badge status-aguardando">Ajustes Pendentes</span>
+                            <span>Aguardando ajustes</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="status-badge status-finalizado">Concluído</span>
+                            <span>Pronto para entrega</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Modal Detalhes -->
+    <div id="modalDetalhes" class="modal" role="dialog" aria-modal="true" aria-label="Detalhes da solicitação">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalhes da Solicitação</h3>
+                <button class="close-modal" type="button" onclick="fecharModal()">&times;</button>
+            </div>
+            <div id="conteudoDetalhes"></div>
+        </div>
+    </div>
+
+    <!-- Modal Gestor -->
+    <div id="modalAcessoGestor" class="modal" role="dialog" aria-modal="true" aria-label="Acesso gestor">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-shield-lock"></i> Acesso de Gestor</h3>
+                <button class="close-modal" type="button" onclick="fecharModalAcessoGestor()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Digite o código de acesso para visualizar funções administrativas:</strong></p>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label for="codigoAcesso">Código de Acesso *</label>
+                    <div style="position: relative;">
+                        <input type="password" id="codigoAcesso" placeholder="••••••" maxlength="6" inputmode="numeric"
+                            style="padding-right: 40px;" />
+                        <button type="button" onclick="togglePasswordVisibility('codigoAcesso', 'toggleIconGestor')"
+                            style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px 8px; color: var(--text-secondary);">
+                            <i id="toggleIconGestor" class="bi bi-eye" style="font-size: 1.2rem;"></i>
+                        </button>
+                    </div>
+                    <small class="help">Apenas gestores possuem este código</small>
+                </div>
+                <div class="btn-group justify-end" style="margin-top: 16px;">
+                    <button class="btn btn-ghost" type="button" onclick="fecharModalAcessoGestor()">Cancelar</button>
+                    <button class="btn btn-primary" type="button" onclick="validarCodigoAcesso()">Acessar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Técnico -->
+    <div id="modalAcessoTecnico" class="modal" role="dialog" aria-modal="true" aria-label="Acesso técnico">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-person-circle"></i> Acesso de Técnico</h3>
+                <button class="close-modal" type="button" onclick="fecharModalAcessoTecnico()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Selecione seu nome e digite o código de acesso:</strong></p>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label for="selectTecnicoAcesso">Selecione seu Nome *</label>
+                    <select id="selectTecnicoAcesso" required>
+                        <option value="" disabled selected>Selecione...</option>
+                        <option value="LAIS">Laís Mendes</option>
+                        <option value="LAIZE">Laize Rodrigues</option>
+                        <option value="VALESKA">Valeska Soares</option>
+                        <option value="LIZABETH">Lizabeth Silva</option>
+                        <option value="ISMAEL">Ismael Alves</option>
+                        <option value="FERNANDO">Fernando Sousa</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top: 12px;">
+                    <label for="codigoAcessoTecnico">Código de Acesso *</label>
+                    <div style="position: relative;">
+                        <input type="password" id="codigoAcessoTecnico" placeholder="••••••" maxlength="6"
+                            inputmode="numeric" style="padding-right: 40px;" />
+                        <button type="button"
+                            onclick="togglePasswordVisibility('codigoAcessoTecnico', 'toggleIconTecnico')"
+                            style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px 8px; color: var(--text-secondary);">
+                            <i id="toggleIconTecnico" class="bi bi-eye" style="font-size: 1.2rem;"></i>
+                        </button>
+                    </div>
+                    <small class="help">Digite seu código pessoal</small>
+                </div>
+                <div class="btn-group justify-end" style="margin-top: 16px;">
+                    <button class="btn btn-ghost" type="button" onclick="fecharModalAcessoTecnico()">Cancelar</button>
+                    <button class="btn btn-primary" type="button" onclick="validarAcessoTecnico()">Acessar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Atribuição -->
+    <div id="modalAtribuicao" class="modal" role="dialog" aria-modal="true" aria-label="Atribuir técnico">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-person-plus"></i> Atribuir Técnico</h3>
+                <button class="close-modal" type="button" onclick="fecharModalAtribuicao()">&times;</button>
+            </div>
+            <div id="conteudoAtribuicao"></div>
+        </div>
+    </div>
+
+    <!-- Modal Relatório -->
+    <div id="modalRelatorio" class="modal" role="dialog" aria-modal="true" aria-label="Relatório">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-bar-chart"></i> Relatório de Solicitações</h3>
+                <button class="close-modal" type="button" onclick="fecharModalRelatorio()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="relatorioPeriodoInicio">Período Inicial *</label>
+                    <div class="date-input-wrapper">
+                        <input type="text" id="relatorioPeriodoInicio" placeholder="DD/MM/AAAA" maxlength="10"
+                            required />
+                        <span class="calendar-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16">
+                                <path
+                                    d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="relatorioPeriodoFim">Período Final *</label>
+                    <div class="date-input-wrapper">
+                        <input type="text" id="relatorioPeriodoFim" placeholder="DD/MM/AAAA" maxlength="10" required />
+                        <span class="calendar-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16">
+                                <path
+                                    d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+                <div class="btn-group justify-end" style="margin-top: 14px;">
+                    <button class="btn btn-ghost" type="button" onclick="fecharModalRelatorio()">Cancelar</button>
+                    <button class="btn btn-success" type="button" onclick="gerarRelatorio()">Gerar Relatório
+                        Completo</button>
+                </div>
+                <div id="resultadoRelatorio" style="margin-top: 18px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmação -->
+    <div id="modalConfirmacao" class="modal" role="dialog" aria-modal="true" aria-label="Confirmação">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Confirmar Ação</h3>
+                <button class="close-modal" type="button" onclick="fecharModalConfirmacao()">&times;</button>
+            </div>
+            <div id="conteudoConfirmacao"></div>
+        </div>
+    </div>
+
+    <!-- Modal Solicitar Ajuste -->
+    <div id="modalAjuste" class="modal" role="dialog" aria-modal="true" aria-label="Solicitar ajuste">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-pencil-square"></i> Solicitar Ajuste</h3>
+                <button class="close-modal" type="button" onclick="fecharModalAjuste()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Criar nova versão com ajustes:</strong></p>
+                <input type="hidden" id="ajusteIdSolicitacao" />
+
+                <div class="form-group" style="margin-top: 16px;">
+                    <label for="ajusteNomeSolicitante">Seu Nome *</label>
+                    <input type="text" id="ajusteNomeSolicitante" placeholder="Digite seu nome completo" required />
+                    <small class="help">Obrigatório - Identifique-se para que o gestor saiba quem solicitou</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="ajusteDiretorioReferencia">Diretório de Referência *</label>
+                    <input type="text" id="ajusteDiretorioReferencia" placeholder="Ex: C:/Projetos/Estudo01" required />
+                    <small class="help">Obrigatório</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="ajusteDiretorioSalvamento">Diretório de Salvamento *</label>
+                    <input type="text" id="ajusteDiretorioSalvamento" placeholder="Ex: C:/Saidas/Estudo01" required />
+                    <small class="help">Obrigatório</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="ajusteTipoAjuste">Tipo de Ajuste *</label>
+                    <select id="ajusteTipoAjuste" required>
+                        <option value="">Selecione...</option>
+                        <option value="CORRECAO">Correção</option>
+                        <option value="ADICAO">Adição de Elementos</option>
+                        <option value="REMOCAO">Remoção de Elementos</option>
+                        <option value="ATUALIZACAO">Atualização de Dados</option>
+                        <option value="OUTROS">Outros</option>
+                    </select>
+                    <small class="help">Obrigatório</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="ajusteObservacoes">Observações do Ajuste *</label>
+                    <textarea id="ajusteObservacoes" rows="4" maxlength="1000"
+                        placeholder="Descreva as alterações necessárias..." required></textarea>
+                    <small class="help" id="helpAjusteObservacoes">
+                        Obrigatório - Seja específico sobre o que precisa ser ajustado
+                        <span class="char-counter"><span class="char-count">0</span>/1000 caracteres</span>
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="ajustePrazoFinal">Novo Prazo Final *</label>
+                    <div class="date-input-wrapper">
+                        <input type="text" id="ajustePrazoFinal" placeholder="DD/MM/AAAA" maxlength="10" required />
+                        <span class="calendar-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16">
+                                <path
+                                    d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                            </svg>
+                        </span>
+                    </div>
+                    <small class="help">Obrigatório</small>
+                </div>
+
+                <div class="btn-group justify-end" style="margin-top: 16px;">
+                    <button class="btn btn-ghost" type="button" onclick="fecharModalAjuste()">Cancelar</button>
+                    <button class="btn btn-primary" type="button" onclick="confirmarSolicitarAjuste()">
+                        <i class="bi bi-check-circle"></i> Solicitar Ajuste
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Histórico de Versões -->
+    <div id="modalHistorico" class="modal" role="dialog" aria-modal="true" aria-label="Histórico de versões">
+        <div class="modal-content" style="max-width: 1100px;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-clock-history"></i> Histórico de Versões</h3>
+                <button class="close-modal" type="button" onclick="fecharModalHistorico()">&times;</button>
+            </div>
+            <div id="conteudoHistorico" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal Ajustes Pendentes -->
+    <div id="modalAjustesPendentes" class="modal" role="dialog" aria-modal="true" aria-label="Ajustes pendentes">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-bell"></i> Ajustes Pendentes de Aprovação</h3>
+                <button class="close-modal" type="button" onclick="fecharModalAjustesPendentes()">&times;</button>
+            </div>
+            <div id="conteudoAjustesPendentes" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação de Reprovação -->
+    <div id="modalConfirmarReprovacao" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirmar Reprovação</h3>
+                <button class="close-modal" type="button" onclick="fecharModalConfirmarReprovacao()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Tem certeza que deseja <strong style="color: #ef4444;">REPROVAR</strong> este ajuste?
+                </p>
+                <div
+                    style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                    <p style="color: #ef4444; margin: 0; font-size: 0.9rem;">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Esta ação é PERMANENTE e não pode ser desfeita!
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label for="motivoReprovacao" style="display: block; margin-bottom: 8px; font-weight: 600;">
+                        Motivo da Reprovação <span style="color: #ef4444;">*</span>
+                    </label>
+                    <textarea id="motivoReprovacao" rows="4" maxlength="1000"
+                        placeholder="Digite o motivo da reprovação..."
+                        style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); resize: vertical; font-family: inherit;"></textarea>
+                    <small class="help" id="helpMotivoReprovacao"
+                        style="display: block; margin-top: 4px; color: var(--muted); font-size: 0.85rem;">
+                        <span class="char-counter"><span class="char-count">0</span>/1000 caracteres</span>
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" type="button" onclick="fecharModalConfirmarReprovacao()">
+                    <i class="bi bi-x"></i> Cancelar
+                </button>
+                <button class="btn btn-danger" type="button" onclick="confirmarReprovacaoAjuste()">
+                    <i class="bi bi-x-circle"></i> Reprovar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="app-footer">
+        Versão: V2.3.6 • © Desenvolvido por Seteg - Soluções Geológicas e Ambientais • 2026
+    </footer>
+
+    <!-- Loader Global -->
+    <div id="globalLoader" class="global-loader" style="display: none;">
+        <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <p class="loader-text">Carregando...</p>
+        </div>
+    </div>
+
+    <!-- Ponto de entrada do Vite -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
