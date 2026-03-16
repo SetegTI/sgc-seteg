@@ -1,3 +1,11 @@
+/**
+ * SGC SETEG - Sistema de Gestão Cartográfica
+ * Ano: 2026
+ * Empresa: SETEG
+ *
+ * Serviço de auditoria — registra logs de ações no banco
+ */
+
 import { supabase } from "./supabaseClient.js";
 
 export async function registrarLog(acao, entidade, entidadeId, dados = {}) {

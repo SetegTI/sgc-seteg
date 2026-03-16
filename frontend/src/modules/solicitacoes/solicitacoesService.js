@@ -1,3 +1,11 @@
+/**
+ * SGC SETEG - Sistema de Gestão Cartográfica
+ * Ano: 2026
+ * Empresa: SETEG
+ *
+ * Serviço de solicitações — criação e listagem de solicitações cartográficas
+ */
+
 import { supabase } from "../../services/supabaseClient.js";
 
 // Status válidos do sistema

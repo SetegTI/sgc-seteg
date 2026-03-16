@@ -1,3 +1,11 @@
+/**
+ * SGC SETEG - Sistema de Gestão Cartográfica
+ * Ano: 2026
+ * Empresa: SETEG
+ *
+ * Serviço de usuários — autenticação por código de acesso
+ */
+
 import { supabase } from "../../services/supabaseClient.js";
 
 export async function buscarUsuarioPorCodigo(codigo) {
