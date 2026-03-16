@@ -505,11 +505,12 @@ function applyTheme(theme) {
 // ============================================
 async function carregarSolicitacoes() {
   try {
-    // Buscar todas as solicitações com suas versões
-    // 2️⃣ FILTRAR: Não mostrar registros deletados
+    // 1 única query: busca solicitações + todas as versões via join
     const { data: listaSolicitacoes, error: erroSolicitacoes } = await supabase
       .from("solicitacoes")
-      .select("id,cliente,empreendimento,status,criado_por,created_at")
+      .select(
+        "id,cliente,empreendimento,status,criado_por,created_at,solicitacao_versoes(numero_versao,dados)",
+      )
       .is("deletado_em", null)
       .order("created_at", { ascending: false });
 
@@ -519,48 +520,35 @@ async function carregarSolicitacoes() {
       return;
     }
 
-    // Para cada solicitação, buscar a versão mais recente
-    solicitacoes = [];
+    // Processar localmente — pegar a versão de maior número de cada solicitação
+    solicitacoes = listaSolicitacoes.map((sol) => {
+      const versoes = sol.solicitacao_versoes || [];
 
-    for (const sol of listaSolicitacoes) {
-      // Buscar a versão mais recente desta solicitação
-      const { data: versoes, error: erroVersoes } = await supabase
-        .from("solicitacao_versoes")
-        .select("*")
-        .eq("solicitacao_id", sol.id)
-        .order("numero_versao", { ascending: false })
-        .limit(1);
-
-      if (erroVersoes) {
-        console.error("Erro ao carregar versão:", erroVersoes);
-        continue;
-      }
-
-      if (versoes && versoes.length > 0) {
-        const versaoAtual = versoes[0];
-
-        // Mesclar dados da solicitação com dados da versão
-        solicitacoes.push({
+      if (versoes.length > 0) {
+        const versaoAtual = versoes.reduce((a, b) =>
+          a.numero_versao > b.numero_versao ? a : b,
+        );
+        return {
           id: sol.id,
-          ...versaoAtual.dados, // Todos os dados detalhados estão aqui
-          status: sol.status, // Status vem da tabela principal
+          ...versaoAtual.dados,
+          status: sol.status,
           versaoAtual: versaoAtual.numero_versao,
           criadoPor: versaoAtual.dados.solicitadoPor || "Sistema",
           criadoEm: sol.created_at,
-        });
-      } else {
-        // Solicitação sem versão (caso dos testes)
-        solicitacoes.push({
-          id: sol.id,
-          cliente: sol.cliente,
-          empreendimento: sol.empreendimento,
-          status: sol.status,
-          criadoEm: sol.created_at,
-          solicitante: "Sistema",
-          nomeEstudo: "Não informado",
-        });
+        };
       }
-    }
+
+      // Solicitação sem versão
+      return {
+        id: sol.id,
+        cliente: sol.cliente,
+        empreendimento: sol.empreendimento,
+        status: sol.status,
+        criadoEm: sol.created_at,
+        solicitante: "Sistema",
+        nomeEstudo: "Não informado",
+      };
+    });
 
     atualizarTabela("todas");
     atualizarEstatisticas();
