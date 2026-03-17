@@ -34,6 +34,10 @@ let tecnicoLogado = null;
 let currentTheme = "dark";
 let filtroAtual = null; // Armazena o filtro atual selecionado
 
+// Paginação
+let paginaAtual = 1;
+let itensPorPagina = 10;
+
 // Restaurar login do localStorage
 function restaurarLogin() {
   const loginSalvo = localStorage.getItem("sgc_login");
@@ -1197,6 +1201,7 @@ function atualizarTabela(filtroStatus = undefined) {
   // Só atualiza filtroAtual se um filtro foi explicitamente passado
   if (filtroStatus !== undefined) {
     filtroAtual = filtroStatus;
+    paginaAtual = 1; // Resetar para página 1 ao mudar filtro
   }
 
   let base = solicitacoes;
@@ -1213,13 +1218,24 @@ function atualizarTabela(filtroStatus = undefined) {
   if (base.length === 0) {
     tabelaSolicitacoes.innerHTML = "";
     emptyState?.classList.add("active");
+    renderizarPaginacao(0);
     return;
   }
 
   emptyState?.classList.remove("active");
 
-  const html = base
-    .sort((a, b) => b.id - a.id)
+  const ordenado = base.sort((a, b) => b.id - a.id);
+  const totalItens = ordenado.length;
+  const totalPaginas = Math.ceil(totalItens / itensPorPagina);
+
+  // Garantir que paginaAtual não ultrapasse o total
+  if (paginaAtual > totalPaginas) paginaAtual = totalPaginas;
+
+  const inicio = (paginaAtual - 1) * itensPorPagina;
+  const fim = inicio + itensPorPagina;
+  const paginados = ordenado.slice(inicio, fim);
+
+  const html = paginados
     .map((s) => {
       const statusClass = getStatusClass(s.status);
       return `
@@ -1246,6 +1262,72 @@ function atualizarTabela(filtroStatus = undefined) {
     .join("");
 
   tabelaSolicitacoes.innerHTML = html;
+  renderizarPaginacao(totalItens);
+}
+
+function renderizarPaginacao(totalItens) {
+  const container = document.getElementById("paginacaoContainer");
+  if (!container) return;
+
+  const totalPaginas = Math.ceil(totalItens / itensPorPagina);
+
+  // Botões de página
+  let btnsPaginas = "";
+  if (totalPaginas > 1) {
+    // Anterior
+    btnsPaginas += `<button class="btn btn-ghost pag-btn" type="button" onclick="irParaPagina(${paginaAtual - 1})" ${paginaAtual === 1 ? "disabled" : ""}>
+      <i class="bi bi-chevron-left"></i>
+    </button>`;
+
+    for (let i = 1; i <= totalPaginas; i++) {
+      btnsPaginas += `<button class="btn pag-btn ${i === paginaAtual ? "btn-primary" : "btn-ghost"}" type="button" onclick="irParaPagina(${i})">${i}</button>`;
+    }
+
+    // Próximo
+    btnsPaginas += `<button class="btn btn-ghost pag-btn" type="button" onclick="irParaPagina(${paginaAtual + 1})" ${paginaAtual === totalPaginas ? "disabled" : ""}>
+      <i class="bi bi-chevron-right"></i>
+    </button>`;
+  }
+
+  const inicio = totalItens === 0 ? 0 : (paginaAtual - 1) * itensPorPagina + 1;
+  const fim = Math.min(paginaAtual * itensPorPagina, totalItens);
+
+  container.innerHTML = `
+    <span class="pag-info">${totalItens === 0 ? "0 registros" : `${inicio}–${fim} de ${totalItens}`}</span>
+    <div class="pag-btns">${btnsPaginas}</div>
+    <div class="pag-seletor">
+      <label for="itensPorPaginaSelect">Por página:</label>
+      <select id="itensPorPaginaSelect" onchange="alterarItensPorPagina(this.value)">
+        <option value="10" ${itensPorPagina === 10 ? "selected" : ""}>10</option>
+        <option value="20" ${itensPorPagina === 20 ? "selected" : ""}>20</option>
+        <option value="30" ${itensPorPagina === 30 ? "selected" : ""}>30</option>
+      </select>
+    </div>
+  `;
+}
+
+function irParaPagina(pagina) {
+  const totalPaginas = Math.ceil(
+    solicitacoes
+      .filter((s) => {
+        if (acessoTecnico && tecnicoLogado && !acessoGestor)
+          return s.tecnicoResponsavel === tecnicoLogado;
+        return true;
+      })
+      .filter(
+        (s) =>
+          !filtroAtual || filtroAtual === "todas" || s.status === filtroAtual,
+      ).length / itensPorPagina,
+  );
+  if (pagina < 1 || pagina > totalPaginas) return;
+  paginaAtual = pagina;
+  atualizarTabela();
+}
+
+function alterarItensPorPagina(valor) {
+  itensPorPagina = Number(valor);
+  paginaAtual = 1;
+  atualizarTabela();
 }
 
 // Detalhes da Solicitação
@@ -2418,6 +2500,9 @@ window.filtrarSolicitacoes = filtrarSolicitacoes;
 window.filtrarMinhasSolicitacoes = filtrarMinhasSolicitacoes;
 
 window.toggleTheme = toggleTheme;
+
+window.irParaPagina = irParaPagina;
+window.alterarItensPorPagina = alterarItensPorPagina;
 
 // Toggle de visibilidade de senha
 function togglePasswordVisibility(inputId, iconId) {

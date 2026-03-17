@@ -2660,3 +2660,56 @@ tbody tr:hover {
     opacity: 0.5;
   }
 }
+
+/* Paginação */
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(31, 41, 55, 0.9);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-theme="light"] .paginacao {
+  border-top-color: rgba(226, 232, 240, 0.9);
+}
+
+.pag-info {
+  font-size: 0.82rem;
+  color: var(--muted);
+  min-width: 80px;
+}
+
+.pag-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pag-btn {
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  min-width: 34px;
+}
+
+.pag-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.pag-seletor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.pag-seletor select {
+  width: auto;
+  padding: 5px 28px 5px 10px;
+  font-size: 0.82rem;
+}
