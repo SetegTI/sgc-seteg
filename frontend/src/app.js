@@ -509,11 +509,11 @@ function applyTheme(theme) {
 // ============================================
 async function carregarSolicitacoes() {
   try {
-    // 1 única query: busca solicitações + todas as versões via join
+    // Buscar solicitações com apenas a versão mais recente (não todas as versões)
     const { data: listaSolicitacoes, error: erroSolicitacoes } = await supabase
       .from("solicitacoes")
       .select(
-        "id,cliente,empreendimento,status,criado_por,created_at,solicitacao_versoes(numero_versao,dados)",
+        "id,cliente,empreendimento,status,tecnico_responsavel,data_conclusao_prevista,data_conclusao_real,criado_por,created_at",
       )
       .is("deletado_em", null)
       .order("created_at", { ascending: false });
@@ -524,30 +524,70 @@ async function carregarSolicitacoes() {
       return;
     }
 
-    // Processar localmente — pegar a versão de maior número de cada solicitação
-    solicitacoes = listaSolicitacoes.map((sol) => {
-      const versoes = sol.solicitacao_versoes || [];
+    if (!listaSolicitacoes || listaSolicitacoes.length === 0) {
+      solicitacoes = [];
+      atualizarTabela("todas");
+      atualizarEstatisticas();
+      atualizarListaTecnicos();
+      atualizarEstatisticasTecnico();
+      return;
+    }
 
-      if (versoes.length > 0) {
-        const versaoAtual = versoes.reduce((a, b) =>
-          a.numero_versao > b.numero_versao ? a : b,
-        );
+    // Buscar apenas a versão mais recente de cada solicitação em uma única query
+    const ids = listaSolicitacoes.map((s) => s.id);
+    const { data: versoes, error: erroVersoes } = await supabase
+      .from("solicitacao_versoes")
+      .select("solicitacao_id,numero_versao,dados")
+      .in("solicitacao_id", ids)
+      .order("numero_versao", { ascending: false });
+
+    if (erroVersoes) {
+      console.error("Erro ao carregar versões:", erroVersoes);
+    }
+
+    // Montar mapa: solicitacao_id -> versão mais recente (já vem ordenado desc)
+    const versaoMaisRecente = {};
+    if (versoes) {
+      for (const v of versoes) {
+        if (!versaoMaisRecente[v.solicitacao_id]) {
+          versaoMaisRecente[v.solicitacao_id] = v;
+        }
+      }
+    }
+
+    // Montar array final
+    solicitacoes = listaSolicitacoes.map((sol) => {
+      const versao = versaoMaisRecente[sol.id];
+
+      if (versao) {
         return {
           id: sol.id,
-          ...versaoAtual.dados,
+          ...versao.dados,
           status: sol.status,
-          versaoAtual: versaoAtual.numero_versao,
-          criadoPor: versaoAtual.dados.solicitadoPor || "Sistema",
+          tecnicoResponsavel:
+            sol.tecnico_responsavel ||
+            versao.dados.tecnicoResponsavel ||
+            "PENDENTE",
+          dataConclusaoPrevista:
+            sol.data_conclusao_prevista ||
+            versao.dados.dataConclusaoPrevista ||
+            null,
+          dataConclusaoReal:
+            sol.data_conclusao_real || versao.dados.dataConclusaoReal || null,
+          versaoAtual: versao.numero_versao,
+          criadoPor: versao.dados.solicitadoPor || "Sistema",
           criadoEm: sol.created_at,
         };
       }
 
-      // Solicitação sem versão
       return {
         id: sol.id,
         cliente: sol.cliente,
         empreendimento: sol.empreendimento,
         status: sol.status,
+        tecnicoResponsavel: sol.tecnico_responsavel || "PENDENTE",
+        dataConclusaoPrevista: sol.data_conclusao_prevista || null,
+        dataConclusaoReal: sol.data_conclusao_real || null,
         criadoEm: sol.created_at,
         solicitante: "Sistema",
         nomeEstudo: "Não informado",
@@ -590,6 +630,7 @@ async function salvarNovaSolicitacao(dados) {
         cliente: dados.cliente,
         empreendimento: dados.empreendimento,
         status: statusInicial, // Sempre "fila" para novas solicitações
+        tecnico_responsavel: "PENDENTE",
         criado_por: null,
       })
       .select()
@@ -671,20 +712,61 @@ async function salvarNovaSolicitacao(dados) {
 // ============================================
 async function atualizarSolicitacao(id, dados) {
   try {
-    // Atualizar campos na tabela principal se necessário
-    if (dados.status) {
-      const { error: erroStatus } = await supabase
+    // Montar objeto de atualização para a tabela principal (colunas reais)
+    const updatePrincipal = {};
+    if (dados.status !== undefined) updatePrincipal.status = dados.status;
+    if (dados.tecnicoResponsavel !== undefined)
+      updatePrincipal.tecnico_responsavel = dados.tecnicoResponsavel;
+    if (dados.dataConclusaoPrevista !== undefined)
+      updatePrincipal.data_conclusao_prevista =
+        dados.dataConclusaoPrevista || null;
+    if (dados.dataConclusaoReal !== undefined)
+      updatePrincipal.data_conclusao_real = dados.dataConclusaoReal || null;
+
+    // Salvar na tabela principal se houver campos para atualizar
+    if (Object.keys(updatePrincipal).length > 0) {
+      console.log(
+        "[SGC] Tentando atualizar solicitacoes id:",
+        id,
+        "dados:",
+        updatePrincipal,
+      );
+      const { data: dadosSalvos, error: erroStatus } = await supabase
         .from("solicitacoes")
-        .update({ status: dados.status })
-        .eq("id", id);
+        .update(updatePrincipal)
+        .eq("id", id)
+        .select();
 
       if (erroStatus) {
-        console.error("Erro ao atualizar status:", erroStatus);
+        console.error(
+          "[SGC] ERRO ao atualizar solicitação principal:",
+          erroStatus,
+        );
+        mostrarNotificacao(
+          "Erro ao salvar no banco: " + erroStatus.message,
+          "error",
+        );
+        return false;
+      }
+
+      console.log(
+        "[SGC] Resultado do update na tabela solicitacoes:",
+        dadosSalvos,
+      );
+
+      if (!dadosSalvos || dadosSalvos.length === 0) {
+        console.error(
+          "[SGC] UPDATE não afetou nenhuma linha! Verifique RLS no Supabase.",
+        );
+        mostrarNotificacao(
+          "Erro: dado não foi salvo (RLS pode estar bloqueando). Verifique o console.",
+          "error",
+        );
         return false;
       }
     }
 
-    // Buscar a versão atual
+    // Buscar a versão atual para atualizar o JSON também (mantém consistência)
     const { data: versoes, error: erroVersoes } = await supabase
       .from("solicitacao_versoes")
       .select("*")
@@ -699,13 +781,13 @@ async function atualizarSolicitacao(id, dados) {
 
     const versaoAtual = versoes[0];
 
-    // Mesclar dados antigos com novos
+    // Mesclar dados antigos com novos no JSON
     const dadosAtualizados = {
       ...versaoAtual.dados,
       ...dados,
     };
 
-    // Atualizar a versão
+    // Atualizar o JSON da versão
     const { error: erroUpdate } = await supabase
       .from("solicitacao_versoes")
       .update({ dados: dadosAtualizados })
@@ -2816,34 +2898,29 @@ async function atualizarContadorAjustesPendentes() {
   }
 
   try {
-    // Buscar todos os ajustes pendentes de todas as solicitações
-    let totalPendentes = 0;
+    // 1 única query para contar todos os ajustes pendentes
+    const { count, error } = await supabase
+      .from("ajustes")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "aguardando_aprovacao");
 
-    for (const solicitacao of solicitacoes) {
-      const ajustes = await obterAjustesPendentes(solicitacao.id);
-      const pendentes = ajustes.filter(
-        (a) => a.status === "aguardando_aprovacao",
-      );
-      totalPendentes += pendentes.length;
-    }
+    if (error) return;
 
     const notifDiv = document.getElementById("notificacoesAjustes");
     const badge = document.getElementById("badgeAjustesPendentes");
 
-    if (notifDiv) {
-      notifDiv.style.display = "block";
-    }
+    if (notifDiv) notifDiv.style.display = "block";
 
     if (badge) {
-      if (totalPendentes > 0) {
-        badge.textContent = totalPendentes;
+      if (count > 0) {
+        badge.textContent = count;
         badge.style.display = "flex";
       } else {
         badge.style.display = "none";
       }
     }
   } catch (error) {
-    // Silencioso - não precisa notificar o usuário
+    // Silencioso
   }
 }
 
@@ -2958,19 +3035,30 @@ async function abrirModalAjustesPendentes() {
 
     modal.classList.add("active");
 
-    // Buscar todos os ajustes pendentes
+    // 1 única query para buscar todos os ajustes pendentes com join
+    const { data: ajustesPendentes, error } = await supabase
+      .from("ajustes")
+      .select("*")
+      .eq("status", "aguardando_aprovacao")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Agrupar por solicitacao_id
     const ajustesPorSolicitacao = [];
+    const idsUnicos = [
+      ...new Set(ajustesPendentes.map((a) => a.solicitacao_id)),
+    ];
 
-    for (const solicitacao of solicitacoes) {
-      const ajustes = await obterAjustesPendentes(solicitacao.id);
-      const pendentes = ajustes.filter(
-        (a) => a.status === "aguardando_aprovacao",
+    for (const solId of idsUnicos) {
+      const solicitacao = solicitacoes.find((s) => s.id === solId);
+      const ajustes = ajustesPendentes.filter(
+        (a) => a.solicitacao_id === solId,
       );
-
-      if (pendentes.length > 0) {
+      if (ajustes.length > 0) {
         ajustesPorSolicitacao.push({
-          solicitacao,
-          ajustes: pendentes,
+          solicitacao: solicitacao || { id: solId },
+          ajustes,
         });
       }
     }
