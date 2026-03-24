@@ -1,5 +1,11 @@
 node_modules
 dist
 .env
+.env.local
+.env.production
 .vscode
 .DS_Store
+
+# Nunca subir pasta de banco e backup
+bd/
+backup/
