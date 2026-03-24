@@ -146,20 +146,34 @@ function formatarTipoMapa(tipo, nomeOutro) {
   return map[tipo] || tipo;
 }
 
+// Cache de técnicos carregada do banco
+let cacheTecnicos = {}; // { "ISMAEL": "Ismael Alves", ... }
+
+async function carregarCacheTecnicos() {
+  try {
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("nome, codigo_acesso")
+      .eq("role", "tecnico");
+    if (error || !data) return;
+    // Montar mapa: PRIMEIRANOME -> nome completo
+    cacheTecnicos = {};
+    data.forEach((u) => {
+      const chave = u.nome
+        .split(" ")[0]
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, ""); // remove acentos
+      cacheTecnicos[chave] = u.nome;
+    });
+  } catch (e) {
+    console.warn("Erro ao carregar técnicos:", e);
+  }
+}
+
 function formatarNomeTecnico(codigo) {
-  if (!codigo) return "Não atribuído";
-
-  // Mapear códigos para nomes completos
-  const nomes = {
-    LAIS: "Laís Mendes",
-    LAIZE: "Laize Rodrigues",
-    VALESKA: "Valeska Soares",
-    LIZABETH: "Lizabeth Silva",
-    ISMAEL: "Ismael Alves",
-    FERNANDO: "Fernando Sousa",
-  };
-
-  return nomes[codigo] || codigo;
+  if (!codigo || codigo === "PENDENTE") return "Não atribuído";
+  return cacheTecnicos[codigo] || codigo;
 }
 
 function formatarFinalidade(finalidade) {
@@ -477,7 +491,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // CARREGAR SOLICITAÇÕES DO SUPABASE
-  carregarSolicitacoes();
+  carregarCacheTecnicos().then(() => carregarSolicitacoes());
 
   // Mostrar painéis após DOM estar pronto
   mostrarPaineisLogin();
@@ -1172,48 +1186,30 @@ async function validarCodigoAcesso() {
 
 async function validarAcessoTecnico() {
   const codigo = document.getElementById("codigoAcessoTecnico")?.value.trim();
-  const tecnicoSelecionado = document.getElementById(
-    "selectTecnicoAcesso",
-  )?.value;
 
-  if (!tecnicoSelecionado) {
-    mostrarNotificacao("Selecione seu nome primeiro!", "warning");
+  if (!codigo) {
+    mostrarNotificacao("Digite seu código de acesso!", "warning");
     return;
   }
 
   const usuario = await verificarCodigoSupabase(codigo);
-
-  if (!usuario) {
-    return;
-  }
+  if (!usuario) return;
 
   if (usuario.role !== "tecnico") {
     mostrarNotificacao("Este código não é de técnico!", "error");
     return;
   }
 
-  // Mapear nome do usuário para código do técnico
-  const mapeamentoNomes = {
-    "Laís Mendes": "LAIS",
-    "Laize Rodrigues": "LAIZE",
-    "Valeska Soares": "VALESKA",
-    "Lizabeth Silva": "LIZABETH",
-    "Ismael Alves": "ISMAEL",
-    "Fernando Sousa": "FERNANDO",
-  };
+  // Derivar código interno do primeiro nome sem acento
+  const codigoTecnico = usuario.nome
+    .split(" ")[0]
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
-  const codigoTecnico = mapeamentoNomes[usuario.nome];
+  // Atualizar cache com esse técnico
+  cacheTecnicos[codigoTecnico] = usuario.nome;
 
-  // Verificar se o código corresponde ao técnico selecionado
-  if (codigoTecnico !== tecnicoSelecionado) {
-    mostrarNotificacao(
-      `Este código não pertence a ${formatarNomeTecnico(tecnicoSelecionado)}!`,
-      "error",
-    );
-    return;
-  }
-
-  // Login como técnico
   acessoTecnico = true;
   tecnicoLogado = codigoTecnico;
   salvarLogin("tecnico", tecnicoLogado);
@@ -1224,11 +1220,9 @@ async function validarAcessoTecnico() {
   atualizarEstatisticas();
   atualizarEstatisticasTecnico();
 
-  // Mostrar painel do técnico
   const painelTecnico = document.getElementById("painelTecnico");
   if (painelTecnico) painelTecnico.style.display = "block";
 
-  // Esconder painel do gestor
   const painelGestor = document.getElementById("painelGestor");
   if (painelGestor) painelGestor.style.display = "none";
 }
@@ -1876,6 +1870,12 @@ function abrirModalAtribuicao(id) {
   const solicitacao = solicitacoes.find((s) => s.id == id);
   if (!solicitacao || !conteudoAtribuicao) return;
 
+  // Gerar options do select a partir do cache de técnicos
+  const optionsTecnicos = Object.entries(cacheTecnicos)
+    .map(([codigo, nome]) =>
+      `<option value="${codigo}" ${solicitacao.tecnicoResponsavel === codigo ? "selected" : ""}>${escapeHtml(nome)}</option>`
+    ).join("");
+
   conteudoAtribuicao.innerHTML = `
     <div class="form-group">
       <p><strong>Solicitação #${id}</strong></p>
@@ -1886,13 +1886,8 @@ function abrirModalAtribuicao(id) {
     <div class="form-group" style="margin-top: 12px;">
       <label for="selectTecnico">Selecione o Técnico *</label>
       <select id="selectTecnico" required>
-        <option value="PENDENTE" disabled selected>Selecione um técnico...</option>
-        <option value="LAIS">Laís Mendes</option>
-        <option value="LAIZE">Laize Rodrigues</option>
-        <option value="VALESKA">Valeska Soares</option>
-        <option value="LIZABETH">Lizabeth Silva</option>
-        <option value="ISMAEL">Ismael Alves</option>
-        <option value="FERNANDO">Fernando Sousa</option>
+        <option value="PENDENTE" disabled ${!solicitacao.tecnicoResponsavel || solicitacao.tecnicoResponsavel === "PENDENTE" ? "selected" : ""}>Selecione um técnico...</option>
+        ${optionsTecnicos}
       </select>
     </div>
 
@@ -1903,15 +1898,9 @@ function abrirModalAtribuicao(id) {
 
     <div class="btn-group justify-end" style="margin-top: 16px;">
       <button class="btn btn-ghost" type="button" onclick="fecharModalAtribuicao()">Cancelar</button>
-      <button class="btn btn-primary" type="button" onclick="atribuirTecnico(${Number(
-        id,
-      )})">Atribuir</button>
+      <button class="btn btn-primary" type="button" onclick="atribuirTecnico(${Number(id)})">Atribuir</button>
     </div>
   `;
-
-  const sel = document.getElementById("selectTecnico");
-  if (sel && solicitacao.tecnicoResponsavel)
-    sel.value = solicitacao.tecnicoResponsavel;
 
   modalAtribuicao?.classList.add("active");
   modalAtribuicao.dataset.solicitacaoId = id;
@@ -2170,15 +2159,8 @@ function gerarRelatorio() {
 
   const foraPrazo = finalizadas - dentroPrazo;
 
-  // Lista de técnicos conhecidos
-  const tecnicos = [
-    "LAIS",
-    "LAIZE",
-    "VALESKA",
-    "LIZABETH",
-    "ISMAEL",
-    "FERNANDO",
-  ];
+  // Usar técnicos do cache (carregado do banco)
+  const tecnicos = Object.keys(cacheTecnicos);
   const estatisticasTecnicos = {};
 
   tecnicos.forEach((tecnico) => {
@@ -2407,16 +2389,35 @@ function atualizarListaTecnicos() {
     return;
   }
 
-  // Lista de técnicos conhecidos
-  const tecnicos = [
-    "LAIS",
-    "LAIZE",
-    "VALESKA",
-    "LIZABETH",
-    "ISMAEL",
-    "FERNANDO",
-  ];
+  const tecnicos = Object.keys(cacheTecnicos);
   let html = "";
+
+  tecnicos.forEach((codigo) => {
+    const solTec = solicitacoes.filter(
+      (s) => s.tecnicoResponsavel === codigo && s.status !== "concluido",
+    );
+    if (solTec.length > 0) {
+      html += `
+        <div class="tecnico-item">
+          <strong>${formatarNomeTecnico(codigo)}</strong>
+          <span class="muted-strong">${solTec.length} projeto(s) em andamento</span>
+          <div class="panel-card-list" style="margin-top: 6px;">
+            ${solTec.slice(0, 3).map((s) =>
+              `<div class="muted">${escapeHtml(s.nomeEstudo || "Sem nome")} - ${escapeHtml(formatarStatus(s.status))}</div>`
+            ).join("")}
+            ${solTec.length > 3 ? `<div class="muted">+ ${solTec.length - 3} outro(s)</div>` : ""}
+          </div>
+        </div>
+      `;
+    }
+  });
+
+  if (!html) {
+    html = '<p class="muted">Nenhum Técnico com projetos em andamento</p>';
+  }
+
+  listaTecnicos.innerHTML = html;
+}
 
   tecnicos.forEach((tecnico) => {
     const solTec = solicitacoes.filter(
