@@ -1872,9 +1872,11 @@ function abrirModalAtribuicao(id) {
 
   // Gerar options do select a partir do cache de técnicos
   const optionsTecnicos = Object.entries(cacheTecnicos)
-    .map(([codigo, nome]) =>
-      `<option value="${codigo}" ${solicitacao.tecnicoResponsavel === codigo ? "selected" : ""}>${escapeHtml(nome)}</option>`
-    ).join("");
+    .map(
+      ([codigo, nome]) =>
+        `<option value="${codigo}" ${solicitacao.tecnicoResponsavel === codigo ? "selected" : ""}>${escapeHtml(nome)}</option>`,
+    )
+    .join("");
 
   conteudoAtribuicao.innerHTML = `
     <div class="form-group">
@@ -2402,47 +2404,14 @@ function atualizarListaTecnicos() {
           <strong>${formatarNomeTecnico(codigo)}</strong>
           <span class="muted-strong">${solTec.length} projeto(s) em andamento</span>
           <div class="panel-card-list" style="margin-top: 6px;">
-            ${solTec.slice(0, 3).map((s) =>
-              `<div class="muted">${escapeHtml(s.nomeEstudo || "Sem nome")} - ${escapeHtml(formatarStatus(s.status))}</div>`
-            ).join("")}
-            ${solTec.length > 3 ? `<div class="muted">+ ${solTec.length - 3} outro(s)</div>` : ""}
-          </div>
-        </div>
-      `;
-    }
-  });
-
-  if (!html) {
-    html = '<p class="muted">Nenhum Técnico com projetos em andamento</p>';
-  }
-
-  listaTecnicos.innerHTML = html;
-}
-
-  tecnicos.forEach((tecnico) => {
-    const solTec = solicitacoes.filter(
-      (s) => s.tecnicoResponsavel === tecnico && s.status !== "concluido",
-    );
-    if (solTec.length > 0) {
-      html += `
-        <div class="tecnico-item">
-          <strong>${formatarNomeTecnico(tecnico)}</strong>
-          <span class="muted-strong">${solTec.length} projeto(s) em andamento</span>
-          <div class="panel-card-list" style="margin-top: 6px;">
             ${solTec
               .slice(0, 3)
               .map(
                 (s) =>
-                  `<div class="muted">${escapeHtml(
-                    s.nomeEstudo || "Sem nome",
-                  )} - ${escapeHtml(formatarStatus(s.status))}</div>`,
+                  `<div class="muted">${escapeHtml(s.nomeEstudo || "Sem nome")} - ${escapeHtml(formatarStatus(s.status))}</div>`,
               )
               .join("")}
-            ${
-              solTec.length > 3
-                ? `<div class="muted">+ ${solTec.length - 3} outro(s)</div>`
-                : ""
-            }
+            ${solTec.length > 3 ? `<div class="muted">+ ${solTec.length - 3} outro(s)</div>` : ""}
           </div>
         </div>
       `;
